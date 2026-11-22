@@ -1,0 +1,25 @@
+<resources>
+    <!-- TODO(Sen): Luxembourgish texts are a first draft, please check them. -->
+
+    <!-- General -->
+    <string name="cancel">Ofbriechen</string>
+
+    <!-- Login -->
+    <string name="login_server_address">Server-Adress</string>
+    <string name="login_connect">Verbannen</string>
+    <string name="login_server_not_found">Kee Jellyfin-Server ënner dëser Adress fonnt.</string>
+    <string name="login_connected_to">Verbonne mat %1$s</string>
+    <string name="login_username">Benotzernumm</string>
+    <string name="login_password">Passwuert</string>
+    <string name="login_sign_in">Umellen</string>
+    <string name="login_sign_in_failed">Umeldung feelgeschloen. Benotzernumm oder Passwuert falsch?</string>
+    <string name="login_quick_connect">Mat Quick Connect umellen</string>
+    <string name="login_quick_connect_instructions">Maach Jellyfin op engem Apparat op, op deem s du ugemellt bass, géi op Quick Connect a gëff dëse Code an:</string>
+    <string name="login_quick_connect_waiting">Waarden op Bestätegung …</string>
+    <string name="login_quick_connect_failed">Quick Connect feelgeschloen oder de Code ass ofgelaf.</string>
+    <string name="login_change_server">Anere Server</string>
+
+    <!-- Signed in -->
+    <string name="signed_in_as">Ugemellt als %1$s op %2$s</string>
+    <string name="sign_out">Ofmellen</string>
+</resources>

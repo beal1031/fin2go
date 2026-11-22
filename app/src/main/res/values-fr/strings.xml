@@ -1,0 +1,23 @@
+<resources>
+    <!-- General -->
+    <string name="cancel">Annuler</string>
+
+    <!-- Login -->
+    <string name="login_server_address">Adresse du serveur</string>
+    <string name="login_connect">Connecter</string>
+    <string name="login_server_not_found">Aucun serveur Jellyfin trouvé à cette adresse.</string>
+    <string name="login_connected_to">Connecté à %1$s</string>
+    <string name="login_username">Nom d’utilisateur</string>
+    <string name="login_password">Mot de passe</string>
+    <string name="login_sign_in">Se connecter</string>
+    <string name="login_sign_in_failed">Échec de la connexion. Nom d’utilisateur ou mot de passe incorrect ?</string>
+    <string name="login_quick_connect">Se connecter avec Quick Connect</string>
+    <string name="login_quick_connect_instructions">Ouvrez Jellyfin sur un appareil où vous êtes connecté, allez dans Quick Connect et saisissez ce code :</string>
+    <string name="login_quick_connect_waiting">En attente de confirmation…</string>
+    <string name="login_quick_connect_failed">Échec de Quick Connect ou code expiré.</string>
+    <string name="login_change_server">Autre serveur</string>
+
+    <!-- Signed in -->
+    <string name="signed_in_as">Connecté en tant que %1$s sur %2$s</string>
+    <string name="sign_out">Se déconnecter</string>
+</resources>

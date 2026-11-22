@@ -7,8 +7,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.account.Account
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
@@ -23,9 +25,9 @@ fun SignedInScreen(
         modifier = modifier.padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Angemeldet als ${account.userName} auf ${account.serverName}")
+        Text(stringResource(R.string.signed_in_as, account.userName, account.serverName))
         Button(onClick = onSignOut) {
-            Text("Abmelden")
+            Text(stringResource(R.string.sign_out))
         }
     }
 }
@@ -38,7 +40,7 @@ private fun SignedInScreenPreview() {
             account = Account(
                 serverId = "1",
                 serverUrl = "http://192.168.1.10:8096",
-                serverName = "Mein Server",
+                serverName = "My Server",
                 userId = "2",
                 userName = "sen",
                 accessToken = "token",
