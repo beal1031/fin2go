@@ -1,0 +1,105 @@
+package io.github.beal1031.fin2go.ui.login
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import io.github.beal1031.fin2go.data.JellyfinClient
+import io.github.beal1031.fin2go.data.account.Account
+import io.github.beal1031.fin2go.data.account.AccountStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+import org.jellyfin.sdk.api.client.extensions.authenticateUserByName
+import org.jellyfin.sdk.api.client.extensions.authenticationApi
+import org.jellyfin.sdk.api.client.extensions.systemApi
+import kotlin.time.Duration.Companion.seconds
+
+/** Everything the login screen shows. */
+data class LoginState(
+    val address: String = "",
+    val serverId: String? = null,
+    val serverUrl: String? = null,
+    val serverName: String? = null,
+    val username: String = "",
+    val password: String = "",
+    val busy: Boolean = false,
+    val error: String? = null,
+)
+
+/**
+ * The logic behind the login screen. It survives screen rotation;
+ * the UI only reads [state] and calls the functions below.
+ */
+class LoginViewModel(application: Application) : AndroidViewModel(application) {
+    private val jellyfin = JellyfinClient.jellyfin(application)
+    private val api = JellyfinClient.api(application)
+    private val accountStore = AccountStore(application)
+
+    private val _state = MutableStateFlow(LoginState())
+    val state: StateFlow<LoginState> = _state.asStateFlow()
+
+    fun onAddressChange(value: String) = _state.update { it.copy(address = value, error = null) }
+    fun onUsernameChange(value: String) = _state.update { it.copy(username = value, error = null) }
+    fun onPasswordChange(value: String) = _state.update { it.copy(password = value, error = null) }
+
+    /** Part 1: find the server. Tries the input with http/https and the usual ports. */
+    fun connect() = runInBackground {
+        val candidates = jellyfin.discovery.getAddressCandidates(_state.value.address.trim())
+
+        for (url in candidates) {
+            try {
+                api.update(baseUrl = url, accessToken = null)
+                val info = withTimeout(5.seconds) { api.systemApi.getPublicSystemInfo().content }
+                _state.update { it.copy(serverId = info.id ?: url, serverUrl = url, serverName = info.serverName ?: url) }
+                return@runInBackground
+            } catch (e: Exception) {
+                // This address did not answer, try the next one.
+            }
+        }
+        _state.update { it.copy(error = "Kein Jellyfin-Server unter dieser Adresse gefunden.") }
+    }
+
+    /**
+     * Part 2: sign in with username and password and save the account.
+     * Once it is saved, the app switches away from the login.
+     */
+    fun login() = runInBackground {
+        val current = _state.value
+        try {
+            val result = api.authenticationApi
+                .authenticateUserByName(username = current.username.trim(), password = current.password)
+                .content
+            val user = checkNotNull(result.user)
+            val serverUrl = checkNotNull(current.serverUrl)
+            accountStore.save(
+                Account(
+                    serverId = current.serverId ?: serverUrl,
+                    serverUrl = serverUrl,
+                    serverName = current.serverName.orEmpty(),
+                    userId = user.id.toString(),
+                    userName = user.name.orEmpty(),
+                    accessToken = checkNotNull(result.accessToken),
+                )
+            )
+            _state.update { it.copy(password = "") }
+        } catch (e: Exception) {
+            _state.update { it.copy(error = "Anmeldung fehlgeschlagen. Benutzername oder Passwort falsch?") }
+        }
+    }
+
+    fun changeServer() = _state.update { it.copy(serverId = null, serverUrl = null, serverName = null, error = null) }
+
+    /** Runs [block] off the main thread and shows the spinner meanwhile. */
+    private fun runInBackground(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, error = null) }
+            withContext(Dispatchers.IO) { block() }
+            _state.update { it.copy(busy = false) }
+        }
+    }
+}

@@ -4,21 +4,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.beal1031.fin2go.ui.home.SignedInScreen
+import io.github.beal1031.fin2go.ui.login.LoginScreen
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
 class MainActivity : ComponentActivity() {
@@ -27,37 +21,23 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Fin2goTheme {
+                val appViewModel: AppViewModel = viewModel()
+                val state by appViewModel.state.collectAsState()
+
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    ServerScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    val contentModifier = Modifier.padding(innerPadding)
+                    when (val current = state) {
+                        // Shown only for a moment while the saved account is read.
+                        AppState.Loading -> Unit
+                        AppState.SignedOut -> LoginScreen(modifier = contentModifier)
+                        is AppState.SignedIn -> SignedInScreen(
+                            account = current.account,
+                            onSignOut = appViewModel::signOut,
+                            modifier = contentModifier,
+                        )
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-fun ServerScreen(modifier: Modifier = Modifier) {
-    var address by remember { mutableStateOf("") }
-
-    Column(modifier = modifier.padding(16.dp)) {
-        OutlinedTextField(
-            value = address,
-            onValueChange = { address = it },
-            label = { Text("Server-Adresse") }
-        )
-        Button(onClick = { /* kommt im nächsten Schritt */ }) {
-            Text("Verbinden")
-        }
-        Text("Eingegeben: $address")
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ServerScreenPreview() {
-    Fin2goTheme {
-        ServerScreen()
     }
 }
