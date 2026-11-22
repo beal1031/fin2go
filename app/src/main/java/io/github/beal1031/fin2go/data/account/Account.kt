@@ -11,7 +11,4 @@ data class Account(
     val userId: String,
     val userName: String,
     val accessToken: String,
-) {
-    /** Unique across servers, because user ids are only unique per server. */
-    val id: String get() = "$serverId/$userId"
-}
+)
