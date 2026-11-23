@@ -36,8 +36,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import io.github.beal1031.fin2go.R
+import io.github.beal1031.fin2go.data.media.EpisodeDetails
 
-// Parts that the movie page and the series page share.
+// Parts that the movie page, the series page and the episode page share.
 
 /**
  * The wide picture (16:9) over the full width, fading into the background at the bottom.
@@ -176,6 +177,12 @@ private fun PlayButtonContent(@StringRes text: Int) {
     )
     Text(text = stringResource(text), modifier = Modifier.padding(start = 8.dp))
 }
+
+/** "S1:E3", or "Special" for an episode of the specials. */
+@Composable
+fun episodeLabel(episode: EpisodeDetails): String =
+    if (episode.seasonNumber == 0) stringResource(R.string.series_special)
+    else stringResource(R.string.episode_number, episode.seasonNumber, episode.episodeNumber)
 
 /** e.g. "2 h 12 min", "2 h" or "12 min". */
 @Composable

@@ -50,7 +50,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import io.github.beal1031.fin2go.R
@@ -64,6 +66,7 @@ import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.DetailHeader
 import io.github.beal1031.fin2go.ui.components.PlayButtons
 import io.github.beal1031.fin2go.ui.components.WatchedButton
+import io.github.beal1031.fin2go.ui.components.episodeLabel
 import io.github.beal1031.fin2go.ui.components.runtimeText
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 import io.github.beal1031.fin2go.ui.withoutTop
@@ -73,6 +76,7 @@ import io.github.beal1031.fin2go.ui.withoutTop
 fun SeriesScreen(
     seriesId: String,
     episodeId: String?,
+    onOpenEpisode: (EpisodeDetails) -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
     // The ViewModel needs to know which series (and episode) to load, so it is created here with the ids.
@@ -81,6 +85,8 @@ fun SeriesScreen(
     },
 ) {
     val state by viewModel.state.collectAsState()
+    // Each time the page is shown again, e.g. back from an episode: load the current state.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
     // Kept when the phone is rotated.
     var overviewExpanded by rememberSaveable { mutableStateOf(false) }
     // Whether the question "Mark season … as watched?" is open.
@@ -93,9 +99,9 @@ fun SeriesScreen(
         onToggleOverview = { overviewExpanded = !overviewExpanded },
         onRetry = viewModel::reload,
         onSelectSeason = viewModel::selectSeason,
-        // Playing and the episode page come in later steps.
+        // Playing comes in a later step.
         onPlay = {},
-        onShowDetails = {},
+        onShowDetails = onOpenEpisode,
         onToggleWatched = viewModel::toggleWatched,
         onAskMarkSeason = { confirmingSeason = true },
         onDismissMarkSeason = { confirmingSeason = false },
@@ -287,12 +293,6 @@ private fun SeriesPlayButtons(
         )
     }
 }
-
-/** "S1:E3", or "Special" for an episode of the specials. */
-@Composable
-private fun episodeLabel(episode: EpisodeDetails): String =
-    if (episode.seasonNumber == 0) stringResource(R.string.series_special)
-    else stringResource(R.string.episode_number, episode.seasonNumber, episode.episodeNumber)
 
 /**
  * Asks before a whole season is marked, as that changes many episodes at once and cannot be undone with one tap.

@@ -24,6 +24,7 @@ import androidx.navigation.toRoute
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.AppTopBarHeight
+import io.github.beal1031.fin2go.ui.episode.EpisodeScreen
 import io.github.beal1031.fin2go.ui.home.HomeScreen
 import io.github.beal1031.fin2go.ui.library.LibraryScreen
 import io.github.beal1031.fin2go.ui.library.LibraryType
@@ -42,6 +43,10 @@ data class LibraryRoute(val type: LibraryType)
 /** The detail page of one movie. */
 @Serializable
 data class MovieRoute(val id: String)
+
+/** The detail page of one episode. */
+@Serializable
+data class EpisodeRoute(val id: String)
 
 /** The detail page of one series. With [episodeId], that episode is chosen; otherwise the one the user is at. */
 @Serializable
@@ -69,7 +74,11 @@ fun AppNavigation(
     val onHome = entry == null || entry.destination.hasRoute<HomeRoute>()
     // The detail pages let their picture run behind the bar.
     val onDetailPage = entry != null &&
-        (entry.destination.hasRoute<MovieRoute>() || entry.destination.hasRoute<SeriesRoute>())
+        (
+            entry.destination.hasRoute<MovieRoute>() ||
+                entry.destination.hasRoute<SeriesRoute>() ||
+                entry.destination.hasRoute<EpisodeRoute>()
+            )
     // In a list: its name. On a detail page: none, the title is big below the picture.
     val title = entry
         ?.takeIf { it.destination.hasRoute<LibraryRoute>() }
@@ -114,11 +123,19 @@ fun AppNavigation(
             }
             composable<SeriesRoute> { entry ->
                 val route = entry.toRoute<SeriesRoute>()
-                SeriesScreen(seriesId = route.id, episodeId = route.episodeId, statusBarHeight = statusBarHeight)
+                SeriesScreen(
+                    seriesId = route.id,
+                    episodeId = route.episodeId,
+                    onOpenEpisode = { open(EpisodeRoute(it.id)) },
+                    statusBarHeight = statusBarHeight,
+                )
+            }
+            composable<EpisodeRoute> { entry ->
+                EpisodeScreen(episodeId = entry.toRoute<EpisodeRoute>().id, statusBarHeight = statusBarHeight)
             }
         }
 
-        // On home: "Fin2Go". In a list: back arrow and its name. On the movie page: only the back arrow.
+        // On home: "Fin2Go". In a list: back arrow and its name. On a detail page: only the back arrow.
         AppTopBar(
             userName = userName,
             profileImageUrl = profileImageUrl,

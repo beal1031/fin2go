@@ -60,6 +60,31 @@ class SeriesViewModel(
         }
     }
 
+    private var shownBefore = false
+
+    /**
+     * Called each time the page is shown. The first time the series is already loading (see init);
+     * later it loads again quietly, e.g. after an episode was marked on the episode page.
+     * The chosen season stays. If it fails, the page already shown stays.
+     */
+    fun onShown() {
+        if (shownBefore) refresh()
+        shownBefore = true
+    }
+
+    private fun refresh() {
+        viewModelScope.launch {
+            try {
+                val series = media.series(seriesId)
+                _state.update { it.copy(series = series) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Stays as it is.
+            }
+        }
+    }
+
     fun selectSeason(season: Int) {
         _state.update { it.copy(selectedSeason = season) }
     }

@@ -168,6 +168,33 @@ class MediaRepository(context: Context) {
         )
     }
 
+    /** One episode with the name and pictures of its series, for the episode page. */
+    suspend fun episode(id: String): EpisodePageDetails = withContext(Dispatchers.IO) {
+        val item = api.libraryApi.getItem(itemId = UUID.fromString(id)).content
+        // As on the series page: without a season number it counts as season 1.
+        val episode = item.toEpisode(item.parentIndexNumber ?: 1, item.indexNumber ?: 1).details
+        val ownImage = item.imageTags?.get(ImageType.PRIMARY)?.let { imageUrl(item.id, ImageType.PRIMARY, it, 1280) }
+        val parentId = item.parentBackdropItemId
+        val parentTag = item.parentBackdropImageTags?.firstOrNull()
+        val seriesBackdrop = if (parentId != null && parentTag != null) {
+            imageUrl(parentId, ImageType.BACKDROP, parentTag, 1280)
+        } else {
+            null
+        }
+        val seriesId = item.seriesId
+        val seriesPosterTag = item.seriesPrimaryImageTag
+        EpisodePageDetails(
+            episode = episode,
+            seriesTitle = item.seriesName?.takeIf { it.isNotBlank() },
+            backdropUrl = ownImage ?: seriesBackdrop,
+            posterUrl = if (seriesId != null && seriesPosterTag != null) {
+                imageUrl(seriesId, ImageType.PRIMARY, seriesPosterTag, 400)
+            } else {
+                null
+            },
+        )
+    }
+
     /** An episode and when it was last watched; the time is only needed to find the current episode. */
     private class Episode(val details: EpisodeDetails, val lastPlayed: LocalDateTime?)
 
