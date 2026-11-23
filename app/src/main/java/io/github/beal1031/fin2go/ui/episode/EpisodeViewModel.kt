@@ -45,6 +45,30 @@ class EpisodeViewModel(application: Application, private val episodeId: String) 
         }
     }
 
+    private var shownBefore = false
+
+    /**
+     * Called each time the page is shown. The first time the episode is already loading (see init);
+     * later it loads again quietly, e.g. with the new progress after watching. If it fails, the page stays.
+     */
+    fun onShown() {
+        if (shownBefore) refresh()
+        shownBefore = true
+    }
+
+    private fun refresh() {
+        viewModelScope.launch {
+            try {
+                val details = media.episode(episodeId)
+                _state.update { it.copy(details = details) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Stays as it is.
+            }
+        }
+    }
+
     /**
      * Marks the episode as watched, or as not watched when it already is. Watched also removes a started position.
      * The page changes at once; if the server call fails, it goes back to how it was.

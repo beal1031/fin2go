@@ -6,3 +6,6 @@ package io.github.beal1031.fin2go.ui
  * with the camera hole centered at the top.
  */
 const val PREVIEW_PHONE = "id:pixel_9_pro_xl"
+
+/** The same phone turned to landscape, for the player. */
+const val PREVIEW_PHONE_LANDSCAPE = "spec:parent=pixel_9_pro_xl,orientation=landscape"

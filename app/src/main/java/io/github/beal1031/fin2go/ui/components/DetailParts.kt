@@ -180,9 +180,13 @@ private fun PlayButtonContent(@StringRes text: Int) {
 
 /** "S1:E3", or "Special" for an episode of the specials. */
 @Composable
-fun episodeLabel(episode: EpisodeDetails): String =
-    if (episode.seasonNumber == 0) stringResource(R.string.series_special)
-    else stringResource(R.string.episode_number, episode.seasonNumber, episode.episodeNumber)
+fun episodeLabel(episode: EpisodeDetails): String = episodeLabel(episode.seasonNumber, episode.episodeNumber)
+
+/** "S1:E3", or "Special" for season 0. */
+@Composable
+fun episodeLabel(seasonNumber: Int, episodeNumber: Int): String =
+    if (seasonNumber == 0) stringResource(R.string.series_special)
+    else stringResource(R.string.episode_number, seasonNumber, episodeNumber)
 
 /** e.g. "2 h 12 min", "2 h" or "12 min". */
 @Composable

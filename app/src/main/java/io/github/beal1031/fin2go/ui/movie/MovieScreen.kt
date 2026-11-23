@@ -27,7 +27,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.MovieDetails
@@ -42,16 +44,19 @@ import io.github.beal1031.fin2go.ui.components.PlayButtons
 import io.github.beal1031.fin2go.ui.components.runtimeText
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
-/** Connects the ViewModel to the UI. Used by the app. */
+/** Connects the ViewModel to the UI. Used by the app. [onPlay] gets the movie id and whether to start from the beginning. */
 @Composable
 fun MovieScreen(
     movieId: String,
+    onPlay: (id: String, fromStart: Boolean) -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
     // The ViewModel needs to know which movie to load, so it is created here with the id.
     viewModel: MovieViewModel = viewModel { MovieViewModel(checkNotNull(this[APPLICATION_KEY]), movieId) },
 ) {
     val state by viewModel.state.collectAsState()
+    // Each time the page is shown again, e.g. back from the player: load the current progress.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
     // Kept when the phone is rotated.
     var overviewExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -60,9 +65,8 @@ fun MovieScreen(
         overviewExpanded = overviewExpanded,
         onToggleOverview = { overviewExpanded = !overviewExpanded },
         onRetry = viewModel::reload,
-        // Playing comes in a later step.
-        onPlay = {},
-        onStartOver = {},
+        onPlay = { onPlay(movieId, false) },
+        onStartOver = { onPlay(movieId, true) },
         onToggleWatched = viewModel::toggleWatched,
         statusBarHeight = statusBarHeight,
         modifier = modifier,

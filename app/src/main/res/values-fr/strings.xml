@@ -70,4 +70,8 @@
         <item quantity="other">%1$d épisodes seront marqués comme non vus.</item>
     </plurals>
     <string name="series_confirm_mark">Marquer</string>
+
+    <!-- Player -->
+    <string name="player_pause">Pause</string>
+    <string name="player_failed">Impossible de lire cette vidéo.</string>
 </resources>

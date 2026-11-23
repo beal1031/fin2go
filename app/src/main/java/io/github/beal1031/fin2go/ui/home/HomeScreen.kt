@@ -48,6 +48,7 @@ fun HomeScreen(
     onShowAllMovies: () -> Unit,
     onOpenMovie: (MediaItem) -> Unit,
     onOpenSeries: (MediaItem) -> Unit,
+    onPlay: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
@@ -62,13 +63,14 @@ fun HomeScreen(
         onShowAllMovies = onShowAllMovies,
         onOpenMovie = onOpenMovie,
         onOpenSeries = onOpenSeries,
+        onPlay = onPlay,
         modifier = modifier,
     )
 }
 
 /**
  * The pure UI: the rows, or loading, error or empty. The top bar is above it, in AppNavigation.
- * A tap on a movie or series opens its detail page. In "Continue watching" a tap will start playing (later),
+ * A tap on a movie or series opens its detail page. In "Continue watching" a tap starts playing at once,
  * so there a long press opens the detail page.
  */
 @Composable
@@ -79,6 +81,7 @@ fun HomeContent(
     onShowAllMovies: () -> Unit,
     onOpenMovie: (MediaItem) -> Unit,
     onOpenSeries: (MediaItem) -> Unit,
+    onPlay: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -105,6 +108,7 @@ fun HomeContent(
                             stringResource(R.string.home_continue_watching),
                             state.continueWatching,
                             wide = true,
+                            onItemClick = onPlay,
                             // An episode opens the page of its series, with this episode chosen.
                             onItemLongClick = { item -> if (item.seriesId != null) onOpenSeries(item) else onOpenMovie(item) },
                         )
@@ -254,6 +258,7 @@ private fun HomePreview(state: HomeState) {
                         onShowAllMovies = {},
                         onOpenMovie = {},
                         onOpenSeries = {},
+                        onPlay = {},
                     )
                 }
             }

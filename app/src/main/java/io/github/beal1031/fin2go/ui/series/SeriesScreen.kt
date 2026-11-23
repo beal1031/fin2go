@@ -77,6 +77,7 @@ fun SeriesScreen(
     seriesId: String,
     episodeId: String?,
     onOpenEpisode: (EpisodeDetails) -> Unit,
+    onPlay: (EpisodeDetails) -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
     // The ViewModel needs to know which series (and episode) to load, so it is created here with the ids.
@@ -99,8 +100,7 @@ fun SeriesScreen(
         onToggleOverview = { overviewExpanded = !overviewExpanded },
         onRetry = viewModel::reload,
         onSelectSeason = viewModel::selectSeason,
-        // Playing comes in a later step.
-        onPlay = {},
+        onPlay = onPlay,
         onShowDetails = onOpenEpisode,
         onToggleWatched = viewModel::toggleWatched,
         onAskMarkSeason = { confirmingSeason = true },

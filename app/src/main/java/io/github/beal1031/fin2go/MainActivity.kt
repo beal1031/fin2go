@@ -2,6 +2,7 @@ package io.github.beal1031.fin2go
 
 import android.graphics.Color
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -15,7 +16,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.ui.AppNavigation
-import io.github.beal1031.fin2go.ui.withoutTop
 import io.github.beal1031.fin2go.ui.login.LoginScreen
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
@@ -27,6 +27,10 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
+        // When the screen turns (into and out of the player), it fades over instead of the big turning animation.
+        window.attributes = window.attributes.apply {
+            rotationAnimation = WindowManager.LayoutParams.ROTATION_ANIMATION_CROSSFADE
+        }
         setContent {
             Fin2goTheme {
                 val appViewModel: AppViewModel = viewModel()
@@ -41,15 +45,14 @@ class MainActivity : ComponentActivity() {
                         AppState.SignedOut -> LoginScreen(modifier = contentModifier)
                         // After a new login the navigation starts again from home, with fresh
                         // ViewModels, so nothing of the previous account remains.
-                        // The status bar space is left to AppNavigation, so pictures can run behind the status bar.
+                        // The space of the bars is left to AppNavigation, so pictures can run behind the status bar
+                        // and the player can fill the whole screen.
                         is AppState.SignedIn -> AppNavigation(
                             userName = current.account.userName,
                             profileImageUrl = current.profileImageUrl,
                             onSignOut = appViewModel::signOut,
+                            systemBarsPadding = innerPadding,
                             statusBarHeight = innerPadding.calculateTopPadding(),
-                            modifier = Modifier
-                                .padding(innerPadding.withoutTop())
-                                .consumeWindowInsets(innerPadding),
                         )
                     }
                 }

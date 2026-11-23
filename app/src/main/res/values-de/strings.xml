@@ -68,4 +68,8 @@
         <item quantity="other">%1$d Folgen werden als nicht gesehen markiert.</item>
     </plurals>
     <string name="series_confirm_mark">Markieren</string>
+
+    <!-- Player -->
+    <string name="player_pause">Pause</string>
+    <string name="player_failed">Dieses Video konnte nicht abgespielt werden.</string>
 </resources>

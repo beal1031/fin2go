@@ -27,7 +27,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.EpisodeDetails
@@ -44,16 +46,19 @@ import io.github.beal1031.fin2go.ui.components.runtimeText
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 import io.github.beal1031.fin2go.ui.withoutTop
 
-/** Connects the ViewModel to the UI. Used by the app. */
+/** Connects the ViewModel to the UI. Used by the app. [onPlay] gets the episode id and whether to start from the beginning. */
 @Composable
 fun EpisodeScreen(
     episodeId: String,
+    onPlay: (id: String, fromStart: Boolean) -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
     // The ViewModel needs to know which episode to load, so it is created here with the id.
     viewModel: EpisodeViewModel = viewModel { EpisodeViewModel(checkNotNull(this[APPLICATION_KEY]), episodeId) },
 ) {
     val state by viewModel.state.collectAsState()
+    // Each time the page is shown again, e.g. back from the player: load the current progress.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
     // Kept when the phone is rotated.
     var overviewExpanded by rememberSaveable { mutableStateOf(false) }
 
@@ -62,9 +67,8 @@ fun EpisodeScreen(
         overviewExpanded = overviewExpanded,
         onToggleOverview = { overviewExpanded = !overviewExpanded },
         onRetry = viewModel::reload,
-        // Playing comes in a later step.
-        onPlay = {},
-        onStartOver = {},
+        onPlay = { onPlay(episodeId, false) },
+        onStartOver = { onPlay(episodeId, true) },
         onToggleWatched = viewModel::toggleWatched,
         statusBarHeight = statusBarHeight,
         modifier = modifier,

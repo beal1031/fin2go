@@ -70,4 +70,8 @@
         <item quantity="other">%1$d Episoden ginn als net gesinn markéiert.</item>
     </plurals>
     <string name="series_confirm_mark">Markéieren</string>
+
+    <!-- Player -->
+    <string name="player_pause">Paus</string>
+    <string name="player_failed">Dëse Video konnt net ofgespillt ginn.</string>
 </resources>

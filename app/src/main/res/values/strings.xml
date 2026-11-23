@@ -78,4 +78,8 @@
         <item quantity="other">%1$d episodes will be marked as not watched.</item>
     </plurals>
     <string name="series_confirm_mark">Mark</string>
+
+    <!-- Player -->
+    <string name="player_pause">Pause</string>
+    <string name="player_failed">This video could not be played.</string>
 </resources>
