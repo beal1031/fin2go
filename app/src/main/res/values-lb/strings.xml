@@ -74,4 +74,6 @@
     <!-- Player -->
     <string name="player_pause">Paus</string>
     <string name="player_failed">Dëse Video konnt net ofgespillt ginn.</string>
+    <string name="player_skip_back">%1$d Sekonnen zréck</string>
+    <string name="player_skip_forward">%1$d Sekonnen no vir</string>
 </resources>

@@ -10,7 +10,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,11 +44,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
@@ -125,10 +128,33 @@ fun PlayerScreen(
         }
     }
 
+    // Jumps in a row in the same direction add up, e.g. two times forward shows "+60 s".
+    // The sum is shown for a moment; 1.5 seconds after the last jump a new row begins.
+    var skipped by remember { mutableStateOf<Skipped?>(null) }
+    LaunchedEffect(skipped) {
+        if (skipped != null) {
+            delay(1.5.seconds)
+            skipped = null
+        }
+    }
+    val skip = { forward: Boolean ->
+        val seconds = if (forward) FORWARD_SECONDS else BACK_SECONDS
+        val row = skipped?.takeIf { it.forward == forward }
+        skipped = Skipped(forward, (row?.seconds ?: 0) + seconds)
+        viewModel.skip(if (forward) seconds * 1_000L else -seconds * 1_000L)
+    }
+
     PlayerContent(
         state = state,
         controlsVisible = controlsVisible,
-        onToggleControls = { controlsVisible = !controlsVisible },
+        skipped = skipped,
+        onTap = { controlsVisible = !controlsVisible },
+        // Each double tap jumps exactly once: left half back, right half forward.
+        onDoubleTap = { leftHalf -> skip(!leftHalf) },
+        onSkip = { forward ->
+            interactions++
+            skip(forward)
+        },
         onPlayPause = {
             interactions++
             viewModel.playPause()
@@ -147,17 +173,28 @@ fun PlayerScreen(
     }
 }
 
+/** How far the last jumps in a row went together, e.g. 60 seconds forward. */
+data class Skipped(val forward: Boolean, val seconds: Int)
+
+const val BACK_SECONDS = 10
+const val FORWARD_SECONDS = 30
+
 /**
- * The pure UI over the [video]: loading, error, or the controls. A tap anywhere shows or hides the controls.
- * Top: back arrow and title (for an episode with season and number). Middle: play/pause.
- * Bottom: timeline with the time played and the time left.
+ * The pure UI over the [video]: loading, error, or the controls.
+ * Top: back arrow and title (for an episode with season and number).
+ * Middle: 10 s back, play/pause, 30 s forward. Bottom: timeline with the time played and the time left.
+ * [onTap] shows or hides the controls; [onDoubleTap] gets whether the left half of the screen was touched.
+ * [skipped] shows the sum of the last jumps on the side they went to.
  * [onSeeking] is called while the timeline is dragged, [onSeek] with the new position when it is let go.
  */
 @Composable
 fun PlayerContent(
     state: PlayerState,
     controlsVisible: Boolean,
-    onToggleControls: () -> Unit,
+    skipped: Skipped?,
+    onTap: () -> Unit,
+    onDoubleTap: (leftHalf: Boolean) -> Unit,
+    onSkip: (forward: Boolean) -> Unit,
     onPlayPause: () -> Unit,
     onSeeking: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -166,12 +203,19 @@ fun PlayerContent(
     modifier: Modifier = Modifier,
     video: @Composable () -> Unit,
 ) {
+    // The touch handling below is set up once; through these it always calls the newest callbacks.
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(Color.Black)
-            // indication = null: no ripple over the whole video on tap.
-            .clickable(interactionSource = null, indication = null, onClick = onToggleControls),
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { currentOnTap() },
+                    onDoubleTap = { currentOnDoubleTap(it.x < size.width / 2) },
+                )
+            },
     ) {
         if (!state.loading) video()
 
@@ -200,12 +244,21 @@ fun PlayerContent(
                         )
                     }
                 }
-                if (!state.loading && !state.error && !state.buffering) {
-                    PlayPauseButton(
-                        playing = state.playWhenReady,
-                        onClick = onPlayPause,
+                if (!state.loading && !state.error) {
+                    Row(
                         modifier = Modifier.align(Alignment.Center),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(48.dp),
+                    ) {
+                        SkipButton(forward = false, onClick = { onSkip(false) })
+                        if (state.buffering) {
+                            // The loading circle below takes this place.
+                            Spacer(modifier = Modifier.size(72.dp))
+                        } else {
+                            PlayPauseButton(playing = state.playWhenReady, onClick = onPlayPause)
+                        }
+                        SkipButton(forward = true, onClick = { onSkip(true) })
+                    }
                 }
             }
         }
@@ -217,7 +270,62 @@ fun PlayerContent(
             state.loading || state.buffering ->
                 CircularProgressIndicator(color = Color.White, modifier = Modifier.align(Alignment.Center))
         }
+
+        // The sum of the last jumps, in the middle of the half that was tapped.
+        skipped?.let {
+            SkippedBadge(
+                skipped = it,
+                modifier = Modifier
+                    .align(if (it.forward) Alignment.CenterEnd else Alignment.CenterStart)
+                    .padding(horizontal = 96.dp),
+            )
+        }
     }
+}
+
+/** Round arrow with the seconds inside: turning back for [BACK_SECONDS], forward for [FORWARD_SECONDS]. */
+@Composable
+private fun SkipButton(forward: Boolean, onClick: () -> Unit) {
+    val seconds = if (forward) FORWARD_SECONDS else BACK_SECONDS
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(56.dp),
+        colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(R.drawable.ic_replay),
+                contentDescription = stringResource(
+                    if (forward) R.string.player_skip_forward else R.string.player_skip_back,
+                    seconds,
+                ),
+                // The same arrow, mirrored, turns forward.
+                modifier = Modifier.size(44.dp).graphicsLayer { scaleX = if (forward) -1f else 1f },
+            )
+            Text(
+                text = seconds.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+/** e.g. "+60 s" or "−10 s" on a dark round background. */
+@Composable
+private fun SkippedBadge(skipped: Skipped, modifier: Modifier = Modifier) {
+    Text(
+        text = stringResource(
+            if (skipped.forward) R.string.player_skipped_forward else R.string.player_skipped_back,
+            skipped.seconds,
+        ),
+        style = MaterialTheme.typography.titleMedium,
+        color = Color.White,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+    )
 }
 
 /** Back arrow, then the title. For an episode a second line, e.g. "S1:E2 · Gran Dillama". */
@@ -408,6 +516,7 @@ private fun PlayerPreview(
     state: PlayerState,
     controlsVisible: Boolean = true,
     picture: PreviewImage = PreviewImage.BACKDROP_TEARS_OF_STEEL,
+    skipped: Skipped? = null,
 ) {
     Fin2goTheme {
         WithPreviewImages {
@@ -417,7 +526,10 @@ private fun PlayerPreview(
                 PlayerContent(
                     state = state,
                     controlsVisible = controlsVisible,
-                    onToggleControls = {},
+                    skipped = skipped,
+                    onTap = {},
+                    onDoubleTap = {},
+                    onSkip = {},
                     onPlayPause = {},
                     onSeeking = {},
                     onSeek = {},
@@ -452,6 +564,16 @@ private fun PlayerHiddenPreview() = PlayerPreview(playingState, controlsVisible 
 @Preview(name = "2c Paused", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
 @Composable
 private fun PlayerPausedPreview() = PlayerPreview(playingState.copy(playWhenReady = false))
+
+@Preview(name = "2c2 Jumped forward twice (double tap)", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerSkippedForwardPreview() =
+    PlayerPreview(playingState, controlsVisible = false, skipped = Skipped(forward = true, seconds = 60))
+
+@Preview(name = "2c3 Jumped back, controls shown", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerSkippedBackPreview() =
+    PlayerPreview(playingState, skipped = Skipped(forward = false, seconds = 10))
 
 @Preview(name = "2d Waiting for data", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
 @Composable

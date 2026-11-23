@@ -74,4 +74,6 @@
     <!-- Player -->
     <string name="player_pause">Pause</string>
     <string name="player_failed">Impossible de lire cette vidéo.</string>
+    <string name="player_skip_back">Reculer de %1$d secondes</string>
+    <string name="player_skip_forward">Avancer de %1$d secondes</string>
 </resources>

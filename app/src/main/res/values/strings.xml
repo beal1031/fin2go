@@ -82,4 +82,9 @@
     <!-- Player -->
     <string name="player_pause">Pause</string>
     <string name="player_failed">This video could not be played.</string>
+    <string name="player_skip_back">Back %1$d seconds</string>
+    <string name="player_skip_forward">Forward %1$d seconds</string>
+    <!-- Sum of the last jumps, shown over the video, e.g. +60 s -->
+    <string name="player_skipped_forward" translatable="false">+%1$d s</string>
+    <string name="player_skipped_back" translatable="false">−%1$d s</string>
 </resources>

@@ -143,6 +143,13 @@ class PlayerViewModel(
 
     fun pause() = player.pause()
 
+    /** Jumps [byMs] forward, or back when negative, but not before the start or past the end. */
+    fun skip(byMs: Long) {
+        val target = (player.currentPosition + byMs).coerceAtLeast(0L)
+        val duration = player.duration
+        seekTo(if (duration == C.TIME_UNSET) target else target.coerceAtMost(duration))
+    }
+
     /** Jumps to [positionMs]. The time is shown at once, so the timeline does not spring back for a moment. */
     fun seekTo(positionMs: Long) {
         player.seekTo(positionMs)
