@@ -32,6 +32,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
+import io.github.beal1031.fin2go.ui.PreviewImage
+import io.github.beal1031.fin2go.ui.WithPreviewImages
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.MediaTile
@@ -142,39 +144,68 @@ private fun MediaRow(title: String, items: List<MediaItem>, wide: Boolean, onSho
 private val sampleState = HomeState(
     loading = false,
     continueWatching = listOf(
-        MediaItem(id = "1", title = "Example Series", seasonNumber = 1, episodeNumber = 3, progress = 0.4f),
-        MediaItem(id = "2", title = "Example Movie", progress = 0.75f),
+        MediaItem(
+            id = "1",
+            title = "Caminandes",
+            seasonNumber = 1,
+            episodeNumber = 2,
+            imageUrl = PreviewImage.EPISODE_CAMINANDES_2.url,
+            progress = 0.4f,
+        ),
+        MediaItem(
+            id = "2",
+            title = "Tears of Steel",
+            imageUrl = PreviewImage.BACKDROP_TEARS_OF_STEEL.url,
+            progress = 0.75f,
+        ),
         // Next episode of a series, not started yet: no bar.
-        MediaItem(id = "11", title = "Next Up Series", seasonNumber = 1, episodeNumber = 9),
+        MediaItem(
+            id = "11",
+            title = "Caminandes",
+            seasonNumber = 1,
+            episodeNumber = 3,
+            imageUrl = PreviewImage.EPISODE_CAMINANDES_3.url,
+        ),
     ),
     latestSeries = listOf(
-        MediaItem(id = "3", title = "First Series"),
-        MediaItem(id = "4", title = "Second Series"),
-        MediaItem(id = "5", title = "Series With A Very Long Name"),
-        MediaItem(id = "6", title = "Watched Series", watched = true),
+        MediaItem(id = "3", title = "Caminandes", imageUrl = PreviewImage.POSTER_CAMINANDES.url),
+        MediaItem(id = "4", title = "Sprite Fright", imageUrl = PreviewImage.POSTER_SPRITE_FRIGHT.url),
+        MediaItem(
+            id = "5",
+            title = "Cosmos Laundromat: First Cycle",
+            imageUrl = PreviewImage.POSTER_COSMOS_LAUNDROMAT.url,
+        ),
+        MediaItem(id = "6", title = "Spring", imageUrl = PreviewImage.POSTER_SPRING.url, watched = true),
     ),
     latestMovies = listOf(
-        MediaItem(id = "7", title = "First Movie"),
-        MediaItem(id = "8", title = "Second Movie"),
-        MediaItem(id = "9", title = "Third Movie"),
-        MediaItem(id = "10", title = "Watched Movie", watched = true),
+        MediaItem(id = "7", title = "Tears of Steel", imageUrl = PreviewImage.POSTER_TEARS_OF_STEEL.url),
+        MediaItem(id = "8", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url),
+        MediaItem(id = "9", title = "Big Buck Bunny", imageUrl = PreviewImage.POSTER_BIG_BUCK_BUNNY.url),
+        MediaItem(
+            id = "10",
+            title = "Elephants Dream",
+            imageUrl = PreviewImage.POSTER_ELEPHANTS_DREAM.url,
+            watched = true,
+        ),
     ),
 )
 
 @Composable
 private fun HomePreview(state: HomeState) {
     Fin2goTheme {
-        // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            // In the app the top bar comes from AppNavigation; here it is added so it looks the same.
-            Column(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
-                AppTopBar(userName = "sen", profileImageUrl = null, onSignOut = {})
-                HomeContent(
-                    state = state,
-                    onRetry = {},
-                    onShowAllSeries = {},
-                    onShowAllMovies = {},
-                )
+        WithPreviewImages {
+            // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
+            Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                // In the app the top bar comes from AppNavigation; here it is added so it looks the same.
+                Column(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
+                    AppTopBar(userName = "sen", profileImageUrl = PreviewImage.PROFILE.url, onSignOut = {})
+                    HomeContent(
+                        state = state,
+                        onRetry = {},
+                        onShowAllSeries = {},
+                        onShowAllMovies = {},
+                    )
+                }
             }
         }
     }

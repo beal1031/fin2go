@@ -31,6 +31,8 @@ import coil3.compose.AsyncImage
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
+import io.github.beal1031.fin2go.ui.PreviewImage
+import io.github.beal1031.fin2go.ui.WithPreviewImages
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
 /**
@@ -106,10 +108,12 @@ fun MediaTile(item: MediaItem, wide: Boolean, modifier: Modifier = Modifier) {
 @Composable
 private fun MediaTilePreview(item: MediaItem, wide: Boolean = false) {
     Fin2goTheme {
-        // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Box(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).padding(16.dp)) {
-                MediaTile(item = item, wide = wide, modifier = Modifier.width(if (wide) 240.dp else 120.dp))
+        WithPreviewImages {
+            // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
+            Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Box(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding).padding(16.dp)) {
+                    MediaTile(item = item, wide = wide, modifier = Modifier.width(if (wide) 240.dp else 120.dp))
+                }
             }
         }
     }
@@ -117,20 +121,37 @@ private fun MediaTilePreview(item: MediaItem, wide: Boolean = false) {
 
 @Preview(name = "1 Poster, not started", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
-private fun MediaTileNotStartedPreview() = MediaTilePreview(MediaItem(id = "1", title = "Example Movie"))
+private fun MediaTileNotStartedPreview() = MediaTilePreview(
+    MediaItem(id = "1", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url),
+)
 
 @Preview(name = "2 Poster, watched", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
-private fun MediaTileWatchedPreview() = MediaTilePreview(MediaItem(id = "1", title = "Example Movie", watched = true))
+private fun MediaTileWatchedPreview() = MediaTilePreview(
+    MediaItem(id = "1", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url, watched = true),
+)
 
 @Preview(name = "3 Wide, started", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
-private fun MediaTileStartedPreview() =
-    MediaTilePreview(MediaItem(id = "1", title = "Example Movie", progress = 0.4f), wide = true)
+private fun MediaTileStartedPreview() = MediaTilePreview(
+    MediaItem(id = "1", title = "Tears of Steel", imageUrl = PreviewImage.BACKDROP_TEARS_OF_STEEL.url, progress = 0.4f),
+    wide = true,
+)
 
 @Preview(name = "4 Wide, episode", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun MediaTileEpisodePreview() = MediaTilePreview(
-    MediaItem(id = "1", title = "Example Series", seasonNumber = 1, episodeNumber = 3, progress = 0.4f),
+    MediaItem(
+        id = "1",
+        title = "Caminandes",
+        seasonNumber = 1,
+        episodeNumber = 3,
+        imageUrl = PreviewImage.EPISODE_CAMINANDES_3.url,
+        progress = 0.4f,
+    ),
     wide = true,
 )
+
+@Preview(name = "5 Poster, no picture", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MediaTileNoPicturePreview() = MediaTilePreview(MediaItem(id = "1", title = "Sintel"))

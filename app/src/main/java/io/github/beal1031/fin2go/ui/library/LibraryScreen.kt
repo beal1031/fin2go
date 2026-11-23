@@ -29,6 +29,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
+import io.github.beal1031.fin2go.ui.PreviewImage
+import io.github.beal1031.fin2go.ui.WithPreviewImages
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.MediaTile
@@ -96,42 +98,62 @@ fun LibraryContent(
 private val sampleSeries = LibraryState(
     loading = false,
     items = listOf(
-        MediaItem(id = "1", title = "A First Series"),
-        MediaItem(id = "2", title = "Another Series", watched = true),
-        MediaItem(id = "3", title = "Black Series"),
-        MediaItem(id = "4", title = "Cold Series"),
-        MediaItem(id = "5", title = "Series With A Very Long Name"),
-        MediaItem(id = "6", title = "The Last Series", watched = true),
-        MediaItem(id = "7", title = "Zebra Series"),
+        MediaItem(id = "1", title = "Big Buck Bunny", imageUrl = PreviewImage.POSTER_BIG_BUCK_BUNNY.url),
+        MediaItem(id = "2", title = "Caminandes", imageUrl = PreviewImage.POSTER_CAMINANDES.url),
+        MediaItem(
+            id = "3",
+            title = "Cosmos Laundromat: First Cycle",
+            imageUrl = PreviewImage.POSTER_COSMOS_LAUNDROMAT.url,
+        ),
+        MediaItem(
+            id = "4",
+            title = "Elephants Dream",
+            imageUrl = PreviewImage.POSTER_ELEPHANTS_DREAM.url,
+            watched = true,
+        ),
+        MediaItem(id = "5", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url),
+        MediaItem(id = "6", title = "Spring", imageUrl = PreviewImage.POSTER_SPRING.url, watched = true),
+        MediaItem(id = "7", title = "Sprite Fright", imageUrl = PreviewImage.POSTER_SPRITE_FRIGHT.url),
     ),
 )
 
 private val sampleMovies = LibraryState(
     loading = false,
     items = listOf(
-        MediaItem(id = "1", title = "A First Movie"),
-        MediaItem(id = "2", title = "Another Movie", progress = 0.3f),
-        MediaItem(id = "3", title = "Big Movie", watched = true),
-        MediaItem(id = "4", title = "Cold Movie"),
-        MediaItem(id = "5", title = "Movie With A Very Long Name"),
+        MediaItem(id = "1", title = "Big Buck Bunny", imageUrl = PreviewImage.POSTER_BIG_BUCK_BUNNY.url),
+        MediaItem(
+            id = "2",
+            title = "Cosmos Laundromat: First Cycle",
+            imageUrl = PreviewImage.POSTER_COSMOS_LAUNDROMAT.url,
+        ),
+        MediaItem(
+            id = "3",
+            title = "Elephants Dream",
+            imageUrl = PreviewImage.POSTER_ELEPHANTS_DREAM.url,
+            progress = 0.3f,
+        ),
+        MediaItem(id = "4", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url, watched = true),
+        MediaItem(id = "5", title = "Tears of Steel", imageUrl = PreviewImage.POSTER_TEARS_OF_STEEL.url),
     ),
 )
 
 @Composable
 private fun LibraryPreview(type: LibraryType, state: LibraryState) {
     Fin2goTheme {
-        // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
-        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            // In the app the top bar comes from AppNavigation; here it is added so it looks the same.
-            Column(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
-                AppTopBar(
-                    userName = "sen",
-                    profileImageUrl = null,
-                    onSignOut = {},
-                    title = stringResource(type.title),
-                    onBack = {},
-                )
-                LibraryContent(type = type, state = state, onRetry = {})
+        WithPreviewImages {
+            // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
+            Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                // In the app the top bar comes from AppNavigation; here it is added so it looks the same.
+                Column(modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)) {
+                    AppTopBar(
+                        userName = "sen",
+                        profileImageUrl = PreviewImage.PROFILE.url,
+                        onSignOut = {},
+                        title = stringResource(type.title),
+                        onBack = {},
+                    )
+                    LibraryContent(type = type, state = state, onRetry = {})
+                }
             }
         }
     }
