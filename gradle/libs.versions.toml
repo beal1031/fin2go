@@ -13,6 +13,7 @@ jellyfinSdk = "1.9.4"
 slf4j = "2.0.20"
 datastore = "1.3.0"
 kotlinxSerialization = "1.13.0"
+coil = "3.6.3"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -34,6 +35,8 @@ jellyfin-sdk = { group = "org.jellyfin.sdk", name = "jellyfin-core", version.ref
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

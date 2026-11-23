@@ -17,7 +17,15 @@
     <string name="login_quick_connect_failed">Échec de Quick Connect ou code expiré.</string>
     <string name="login_change_server">Autre serveur</string>
 
-    <!-- Signed in -->
-    <string name="signed_in_as">Connecté en tant que %1$s sur %2$s</string>
+    <!-- Home -->
+    <string name="home_continue_watching">Reprendre</string>
+    <string name="home_series">Séries</string>
+    <string name="home_movies">Films</string>
+    <string name="home_show_all">Tout afficher</string>
+    <string name="home_watched">Vu</string>
+    <string name="home_load_failed">Impossible de charger depuis le serveur.</string>
+    <string name="home_retry">Réessayer</string>
+    <string name="home_empty">Il n’y a pas encore de films ou de séries sur le serveur.</string>
+    <string name="profile_menu">Menu du profil</string>
     <string name="sign_out">Se déconnecter</string>
 </resources>

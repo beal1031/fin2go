@@ -19,7 +19,15 @@
     <string name="login_quick_connect_failed">Quick Connect feelgeschloen oder de Code ass ofgelaf.</string>
     <string name="login_change_server">Anere Server</string>
 
-    <!-- Signed in -->
-    <string name="signed_in_as">Ugemellt als %1$s op %2$s</string>
+    <!-- Home -->
+    <string name="home_continue_watching">Weiderkucken</string>
+    <string name="home_series">Serien</string>
+    <string name="home_movies">Filmer</string>
+    <string name="home_show_all">All weisen</string>
+    <string name="home_watched">Gekuckt</string>
+    <string name="home_load_failed">Lueden vum Server feelgeschloen.</string>
+    <string name="home_retry">Nach eng Kéier probéieren</string>
+    <string name="home_empty">Um Server ginn et nach keng Filmer oder Serien.</string>
+    <string name="profile_menu">Profilmenü</string>
     <string name="sign_out">Ofmellen</string>
 </resources>

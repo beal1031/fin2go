@@ -17,7 +17,15 @@
     <string name="login_quick_connect_failed">Quick Connect fehlgeschlagen oder Code abgelaufen.</string>
     <string name="login_change_server">Anderer Server</string>
 
-    <!-- Signed in -->
-    <string name="signed_in_as">Angemeldet als %1$s auf %2$s</string>
+    <!-- Home -->
+    <string name="home_continue_watching">Weiterschauen</string>
+    <string name="home_series">Serien</string>
+    <string name="home_movies">Filme</string>
+    <string name="home_show_all">Alle anzeigen</string>
+    <string name="home_watched">Gesehen</string>
+    <string name="home_load_failed">Laden vom Server fehlgeschlagen.</string>
+    <string name="home_retry">Erneut versuchen</string>
+    <string name="home_empty">Auf dem Server gibt es noch keine Filme oder Serien.</string>
+    <string name="profile_menu">Profilmenü</string>
     <string name="sign_out">Abmelden</string>
 </resources>

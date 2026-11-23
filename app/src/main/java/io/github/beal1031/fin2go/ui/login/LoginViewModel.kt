@@ -92,6 +92,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
     fun login() = runInBackground {
         val current = _state.value
         try {
+            useChosenServer()
             val result = api.authenticationApi
                 .authenticateUserByName(username = current.username.trim(), password = current.password)
                 .content
@@ -111,6 +112,7 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
         quickConnectJob = viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(error = null) }
             try {
+                useChosenServer()
                 var quickConnect = api.authenticationApi.initiateQuickConnect().content
                 _state.update { it.copy(quickConnectCode = quickConnect.code) }
 
@@ -143,6 +145,14 @@ class LoginViewModel(application: Application) : AndroidViewModel(application) {
         _state.update {
             it.copy(serverId = null, serverUrl = null, serverName = null, quickConnectEnabled = false, error = null)
         }
+    }
+
+    /**
+     * Points the API client at the server found in part 1. Needed because signing out
+     * resets the client, while this screen still shows the server from before.
+     */
+    private fun useChosenServer() {
+        api.update(baseUrl = checkNotNull(_state.value.serverUrl), accessToken = null)
     }
 
     private suspend fun saveAccount(result: AuthenticationResult) {
