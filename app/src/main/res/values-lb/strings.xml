@@ -38,6 +38,13 @@
 
     <!-- Movie detail page -->
     <string name="movie_play">Ofspillen</string>
+    <string name="movie_resume">Weiderkucken</string>
+    <string name="movie_start_over">Vu vir</string>
+    <string name="movie_play_again">Nach eng Kéier ofspillen</string>
+    <string name="movie_mark_watched">Als gekuckt markéieren</string>
+    <string name="movie_mark_unwatched">Als net gekuckt markéieren</string>
+    <!-- Time still to watch, e.g. "nach 45 Min." -->
+    <string name="movie_time_left">nach %1$s</string>
     <!-- Running time, e.g. 2 St. 12 Min. -->
     <string name="runtime_hours_minutes">%1$d St. %2$d Min.</string>
     <string name="runtime_hours">%1$d St.</string>

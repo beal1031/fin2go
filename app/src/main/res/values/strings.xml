@@ -40,6 +40,13 @@
 
     <!-- Movie detail page -->
     <string name="movie_play">Play</string>
+    <string name="movie_resume">Resume</string>
+    <string name="movie_start_over">Start over</string>
+    <string name="movie_play_again">Play again</string>
+    <string name="movie_mark_watched">Mark as watched</string>
+    <string name="movie_mark_unwatched">Mark as not watched</string>
+    <!-- Time still to watch, e.g. "45 min left" -->
+    <string name="movie_time_left">%1$s left</string>
     <!-- Running time, e.g. 2 h 12 min -->
     <string name="runtime_hours_minutes">%1$d h %2$d min</string>
     <string name="runtime_hours">%1$d h</string>

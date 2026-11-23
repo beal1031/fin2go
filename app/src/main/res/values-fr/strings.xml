@@ -36,6 +36,13 @@
 
     <!-- Movie detail page -->
     <string name="movie_play">Lire</string>
+    <string name="movie_resume">Reprendre</string>
+    <string name="movie_start_over">Depuis le début</string>
+    <string name="movie_play_again">Revoir</string>
+    <string name="movie_mark_watched">Marquer comme vu</string>
+    <string name="movie_mark_unwatched">Marquer comme non vu</string>
+    <!-- Time still to watch, e.g. "encore 45 min" -->
+    <string name="movie_time_left">encore %1$s</string>
     <!-- Running time, e.g. 2 h 12 min -->
     <string name="runtime_hours_minutes">%1$d h %2$d min</string>
     <string name="runtime_hours">%1$d h</string>

@@ -3,22 +3,29 @@ package io.github.beal1031.fin2go.ui.movie
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -27,8 +34,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -72,6 +81,8 @@ fun MovieScreen(
         onRetry = viewModel::reload,
         // Playing comes in a later step.
         onPlay = {},
+        onStartOver = {},
+        onToggleWatched = viewModel::toggleWatched,
         statusBarHeight = statusBarHeight,
         modifier = modifier,
     )
@@ -88,6 +99,8 @@ fun MovieContent(
     onToggleOverview: () -> Unit,
     onRetry: () -> Unit,
     onPlay: () -> Unit,
+    onStartOver: () -> Unit,
+    onToggleWatched: () -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -100,7 +113,15 @@ fun MovieContent(
                 Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
             }
 
-            else -> MovieDetailsView(state.movie, overviewExpanded, onToggleOverview, onPlay, statusBarHeight)
+            else -> MovieDetailsView(
+                state.movie,
+                overviewExpanded,
+                onToggleOverview,
+                onPlay,
+                onStartOver,
+                onToggleWatched,
+                statusBarHeight,
+            )
         }
     }
 }
@@ -112,6 +133,8 @@ private fun MovieDetailsView(
     overviewExpanded: Boolean,
     onToggleOverview: () -> Unit,
     onPlay: () -> Unit,
+    onStartOver: () -> Unit,
+    onToggleWatched: () -> Unit,
     statusBarHeight: Dp,
 ) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -122,11 +145,12 @@ private fun MovieDetailsView(
         ) {
             Text(text = movie.title, style = MaterialTheme.typography.headlineSmall)
 
-            // e.g. "2012 · 12 min · FSK-12"; missing parts are left out.
+            // e.g. "2012 · 12 min · FSK-12 · Watched"; missing parts are left out.
             val facts = listOfNotNull(
                 movie.year?.toString(),
                 movie.runtimeMinutes?.let { runtimeText(it) },
                 movie.ageRating,
+                if (movie.watched) stringResource(R.string.watched) else null,
             )
             if (facts.isNotEmpty()) {
                 Text(
@@ -143,14 +167,7 @@ private fun MovieDetailsView(
                 )
             }
             // Above the description, so it stays in reach when the description is long or expanded.
-            Button(onClick = onPlay, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_play),
-                    contentDescription = null,
-                    modifier = Modifier.size(ButtonDefaults.IconSize),
-                )
-                Text(text = stringResource(R.string.movie_play), modifier = Modifier.padding(start = 8.dp))
-            }
+            PlayButtons(movie, onPlay, onStartOver, onToggleWatched, modifier = Modifier.padding(top = 8.dp))
             movie.overview?.let { overview ->
                 Text(
                     text = overview,
@@ -165,6 +182,91 @@ private fun MovieDetailsView(
             }
         }
     }
+}
+
+/**
+ * Depends on how far the movie was watched:
+ * not started: "Play"; started: progress bar with the time left, "Resume" and "Start over"; watched: "Play again".
+ * On the right there is always the round watched button.
+ */
+@Composable
+private fun PlayButtons(
+    movie: MovieDetails,
+    onPlay: () -> Unit,
+    onStartOver: () -> Unit,
+    onToggleWatched: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        val progress = movie.progress
+        if (progress != null) {
+            // Same look as the bar on the tiles, with a track for the part still to watch.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(progress)
+                            .fillMaxHeight()
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
+                movie.remainingMinutes?.let {
+                    Text(
+                        text = stringResource(R.string.movie_time_left, runtimeText(it)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (progress != null) {
+                Button(onClick = onPlay, modifier = Modifier.weight(1f)) {
+                    PlayButtonContent(R.string.movie_resume)
+                }
+                OutlinedButton(onClick = onStartOver) {
+                    Text(text = stringResource(R.string.movie_start_over))
+                }
+            } else {
+                Button(onClick = onPlay, modifier = Modifier.weight(1f)) {
+                    PlayButtonContent(if (movie.watched) R.string.movie_play_again else R.string.movie_play)
+                }
+            }
+            WatchedButton(watched = movie.watched, onClick = onToggleWatched)
+        }
+    }
+}
+
+/** Round check mark button: filled when watched, only outlined when not. A tap switches between the two. */
+@Composable
+private fun WatchedButton(watched: Boolean, onClick: () -> Unit) {
+    val description = stringResource(if (watched) R.string.movie_mark_unwatched else R.string.movie_mark_watched)
+    val icon = @Composable {
+        Icon(painter = painterResource(R.drawable.ic_check), contentDescription = description)
+    }
+    if (watched) {
+        FilledIconButton(onClick = onClick, content = icon)
+    } else {
+        OutlinedIconButton(onClick = onClick, content = icon)
+    }
+}
+
+/** Play triangle and text, inside a button. */
+@Composable
+private fun PlayButtonContent(@StringRes text: Int) {
+    Icon(
+        painter = painterResource(R.drawable.ic_play),
+        contentDescription = null,
+        modifier = Modifier.size(ButtonDefaults.IconSize),
+    )
+    Text(text = stringResource(text), modifier = Modifier.padding(start = 8.dp))
 }
 
 /**
@@ -262,6 +364,8 @@ private fun MoviePreview(state: MovieState, overviewExpanded: Boolean = false) {
                         onToggleOverview = {},
                         onRetry = {},
                         onPlay = {},
+                        onStartOver = {},
+                        onToggleWatched = {},
                         statusBarHeight = statusBarHeight,
                     )
                     AppTopBar(
@@ -337,6 +441,30 @@ private fun MovieLongTitlePreview() = MoviePreview(
 @Preview(name = "2h Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
 @Composable
 private fun MovieLanguagesPreview() = MoviePreview(MovieState(loading = false, movie = sampleMovie))
+
+private val startedMovie = sampleMovie.copy(runtimeMinutes = 112, progress = 0.6f, remainingMinutes = 45)
+
+@Preview(name = "4 Started: resume or start over", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MovieStartedPreview() = MoviePreview(MovieState(loading = false, movie = startedMovie))
+
+@Preview(name = "4b German", showSystemUi = true, device = PREVIEW_PHONE, locale = "de")
+@Preview(name = "4c French", showSystemUi = true, device = PREVIEW_PHONE, locale = "fr")
+@Preview(name = "4d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
+@Composable
+private fun MovieStartedLanguagesPreview() = MoviePreview(MovieState(loading = false, movie = startedMovie))
+
+private val watchedMovie = sampleMovie.copy(watched = true)
+
+@Preview(name = "5 Watched: play again", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MovieWatchedPreview() = MoviePreview(MovieState(loading = false, movie = watchedMovie))
+
+@Preview(name = "5b German", showSystemUi = true, device = PREVIEW_PHONE, locale = "de")
+@Preview(name = "5c French", showSystemUi = true, device = PREVIEW_PHONE, locale = "fr")
+@Preview(name = "5d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
+@Composable
+private fun MovieWatchedLanguagesPreview() = MoviePreview(MovieState(loading = false, movie = watchedMovie))
 
 @Preview(name = "3 Error", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable

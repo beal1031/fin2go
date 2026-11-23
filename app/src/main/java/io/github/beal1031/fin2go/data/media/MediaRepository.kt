@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.showApi
+import org.jellyfin.sdk.api.client.extensions.userDataApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
@@ -91,6 +92,10 @@ class MediaRepository(context: Context) {
     /** All details of one movie for the detail page. */
     suspend fun movie(id: String): MovieDetails = withContext(Dispatchers.IO) {
         val item = api.libraryApi.getItem(itemId = UUID.fromString(id)).content
+        val position = item.userData?.playbackPositionTicks ?: 0L
+        // As for the tiles: a saved position means started, even when it was watched before.
+        // Null when not started (or the running time is unknown).
+        val startedRuntime = item.runTimeTicks?.takeIf { it > 0L && position > 0L }
         MovieDetails(
             id = item.id.toString(),
             title = item.name.orEmpty(),
@@ -102,7 +107,18 @@ class MediaRepository(context: Context) {
             overview = item.overview?.takeIf { it.isNotBlank() },
             backdropUrl = item.backdropImageTags?.firstOrNull()?.let { imageUrl(item.id, ImageType.BACKDROP, it, 1280) },
             posterUrl = posterUrl(item),
+            progress = startedRuntime?.let { (position.toFloat() / it).coerceIn(0f, 1f) },
+            remainingMinutes = startedRuntime?.let { ((it - position + 300_000_000L) / 600_000_000L).toInt().coerceAtLeast(1) },
+            watched = startedRuntime == null && item.userData?.played == true,
         )
+    }
+
+    /** Marks a movie or episode as fully watched, or as not watched. */
+    suspend fun setWatched(id: String, watched: Boolean) {
+        withContext(Dispatchers.IO) {
+            val itemId = UUID.fromString(id)
+            if (watched) api.userDataApi.markPlayedItem(itemId = itemId) else api.userDataApi.markUnplayedItem(itemId = itemId)
+        }
     }
 
     /** The profile picture of the user. The server answers with an error when there is none. */

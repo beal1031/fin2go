@@ -15,4 +15,10 @@ data class MovieDetails(
     val backdropUrl: String? = null,
     /** Portrait poster (2:3), used blurred when there is no backdrop. */
     val posterUrl: String? = null,
+    /** How much was already watched, from 0 to 1. Null when not started or fully watched. */
+    val progress: Float? = null,
+    /** Minutes still to watch when started, rounded, at least 1. */
+    val remainingMinutes: Int? = null,
+    /** Fully watched. Watched and started again counts as started. */
+    val watched: Boolean = false,
 )

@@ -39,17 +39,34 @@ class LibraryViewModel(application: Application, private val type: LibraryType) 
         reload()
     }
 
+
+    private var shownBefore = false
+
+    /**
+     * Called each time the screen is shown. The first time the data is already loading (see init);
+     * later the screen loads again quietly, so watched marks and progress are up to date.
+     */
+    fun onShown() {
+        if (shownBefore) refresh()
+        shownBefore = true
+    }
+
     /** Loads the whole list again. On failure, the error with a retry button is shown. */
-    fun reload() {
+    fun reload() = load(quiet = false)
+
+    /** Loads again without the loading circle. If it fails, the list already shown stays. */
+    private fun refresh() = load(quiet = true)
+
+    private fun load(quiet: Boolean) {
         viewModelScope.launch {
-            _state.update { it.copy(loading = true, error = false) }
+            if (!quiet) _state.update { it.copy(loading = true, error = false) }
             try {
                 val items = media.all(type.itemKind)
-                _state.update { it.copy(loading = false, items = items) }
+                _state.update { it.copy(loading = false, error = false, items = items) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update { it.copy(loading = false, error = true) }
+                if (!quiet) _state.update { it.copy(loading = false, error = true) }
             }
         }
     }

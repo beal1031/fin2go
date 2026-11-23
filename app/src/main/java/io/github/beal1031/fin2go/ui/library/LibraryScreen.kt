@@ -24,7 +24,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.APPLICATION_KEY
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.MediaItem
@@ -46,6 +48,8 @@ fun LibraryScreen(
     viewModel: LibraryViewModel = viewModel { LibraryViewModel(checkNotNull(this[APPLICATION_KEY]), type) },
 ) {
     val state by viewModel.state.collectAsState()
+    // Each time the screen is shown again, e.g. back from a movie or back in the app: load the current state.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
 
     LibraryContent(
         type = type,
