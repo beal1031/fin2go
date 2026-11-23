@@ -3,6 +3,12 @@
 
     <!-- General -->
     <string name="cancel">Ofbriechen</string>
+    <string name="series">Serien</string>
+    <string name="movies">Filmer</string>
+    <string name="watched">Gekuckt</string>
+    <string name="load_failed">Lueden vum Server feelgeschloen.</string>
+    <string name="retry">Nach eng Kéier probéieren</string>
+    <string name="back">Zréck</string>
 
     <!-- Login -->
     <string name="login_server_address">Server-Adress</string>
@@ -21,13 +27,12 @@
 
     <!-- Home -->
     <string name="home_continue_watching">Weiderkucken</string>
-    <string name="home_series">Serien</string>
-    <string name="home_movies">Filmer</string>
     <string name="home_show_all">All weisen</string>
-    <string name="home_watched">Gekuckt</string>
-    <string name="home_load_failed">Lueden vum Server feelgeschloen.</string>
-    <string name="home_retry">Nach eng Kéier probéieren</string>
     <string name="home_empty">Um Server ginn et nach keng Filmer oder Serien.</string>
     <string name="profile_menu">Profilmenü</string>
     <string name="sign_out">Ofmellen</string>
+
+    <!-- Library: all series or all movies -->
+    <string name="library_empty_series">Um Server ginn et nach keng Serien.</string>
+    <string name="library_empty_movies">Um Server ginn et nach keng Filmer.</string>
 </resources>

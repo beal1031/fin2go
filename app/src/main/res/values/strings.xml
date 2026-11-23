@@ -3,6 +3,14 @@
 
     <!-- General -->
     <string name="cancel">Cancel</string>
+    <string name="series">Series</string>
+    <string name="movies">Movies</string>
+    <string name="watched">Watched</string>
+    <!-- Season and episode number, e.g. S1:E3 -->
+    <string name="episode_number" translatable="false">S%1$d:E%2$d</string>
+    <string name="load_failed">Could not load from the server.</string>
+    <string name="retry">Try again</string>
+    <string name="back">Back</string>
 
     <!-- Login -->
     <string name="login_server_address">Server address</string>
@@ -21,15 +29,12 @@
 
     <!-- Home -->
     <string name="home_continue_watching">Continue watching</string>
-    <string name="home_series">Series</string>
-    <string name="home_movies">Movies</string>
     <string name="home_show_all">Show all</string>
-    <string name="home_watched">Watched</string>
-    <!-- Season and episode number, e.g. S1:E3 -->
-    <string name="home_episode_number" translatable="false">S%1$d:E%2$d</string>
-    <string name="home_load_failed">Could not load from the server.</string>
-    <string name="home_retry">Try again</string>
     <string name="home_empty">There are no movies or series on the server yet.</string>
     <string name="profile_menu">Profile menu</string>
     <string name="sign_out">Sign out</string>
+
+    <!-- Library: all series or all movies -->
+    <string name="library_empty_series">There are no series on the server yet.</string>
+    <string name="library_empty_movies">There are no movies on the server yet.</string>
 </resources>

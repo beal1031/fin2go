@@ -1,6 +1,12 @@
 <resources>
     <!-- General -->
     <string name="cancel">Abbrechen</string>
+    <string name="series">Serien</string>
+    <string name="movies">Filme</string>
+    <string name="watched">Gesehen</string>
+    <string name="load_failed">Laden vom Server fehlgeschlagen.</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="back">Zurück</string>
 
     <!-- Login -->
     <string name="login_server_address">Server-Adresse</string>
@@ -19,13 +25,12 @@
 
     <!-- Home -->
     <string name="home_continue_watching">Weiterschauen</string>
-    <string name="home_series">Serien</string>
-    <string name="home_movies">Filme</string>
     <string name="home_show_all">Alle anzeigen</string>
-    <string name="home_watched">Gesehen</string>
-    <string name="home_load_failed">Laden vom Server fehlgeschlagen.</string>
-    <string name="home_retry">Erneut versuchen</string>
     <string name="home_empty">Auf dem Server gibt es noch keine Filme oder Serien.</string>
     <string name="profile_menu">Profilmenü</string>
     <string name="sign_out">Abmelden</string>
+
+    <!-- Library: all series or all movies -->
+    <string name="library_empty_series">Auf dem Server gibt es noch keine Serien.</string>
+    <string name="library_empty_movies">Auf dem Server gibt es noch keine Filme.</string>
 </resources>

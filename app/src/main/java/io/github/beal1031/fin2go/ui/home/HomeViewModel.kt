@@ -3,7 +3,6 @@ package io.github.beal1031.fin2go.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.github.beal1031.fin2go.data.account.AccountStore
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.data.media.MediaRepository
 import kotlinx.coroutines.CancellationException
@@ -12,15 +11,12 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
 
 /** Everything the home screen shows. */
 data class HomeState(
-    val userName: String = "",
-    val profileImageUrl: String? = null,
     val loading: Boolean = true,
     val error: Boolean = false,
     val continueWatching: List<MediaItem> = emptyList(),
@@ -33,20 +29,12 @@ data class HomeState(
 
 /** Loads the three rows of the home screen. */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
-    private val accountStore = AccountStore(application)
     private val media = MediaRepository(application)
 
     private val _state = MutableStateFlow(HomeState())
     val state: StateFlow<HomeState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            accountStore.account.first()?.let { account ->
-                _state.update {
-                    it.copy(userName = account.userName, profileImageUrl = media.profileImageUrl(account.userId))
-                }
-            }
-        }
         reload()
     }
 

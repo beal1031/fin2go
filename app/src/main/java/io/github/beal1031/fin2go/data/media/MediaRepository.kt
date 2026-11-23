@@ -12,7 +12,9 @@ import org.jellyfin.sdk.api.client.extensions.showApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaType
+import org.jellyfin.sdk.model.api.SortOrder
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -66,6 +68,24 @@ class MediaRepository(context: Context) {
             .map { it.toMediaItem(posterUrl(it)) }
             // sortedBy keeps the order within each group, so both stay newest first.
             .sortedBy { it.watched }
+    }
+
+    /**
+     * All series or all movies of the user's libraries, sorted by name (A–Z), shown with a poster.
+     * Everything is loaded at once; the pictures are only loaded when a tile becomes visible.
+     */
+    suspend fun all(type: BaseItemKind): List<MediaItem> = withContext(Dispatchers.IO) {
+        api.libraryApi.getItems(
+            includeItemTypes = listOf(type),
+            // Also look inside folders, otherwise only the top level of a library is returned.
+            recursive = true,
+            sortBy = listOf(ItemSortBy.SORT_NAME),
+            sortOrder = listOf(SortOrder.ASCENDING),
+            enableUserData = true,
+            // The total count is not needed and costs the server extra work.
+            enableTotalRecordCount = false,
+        ).content.items
+            .map { it.toMediaItem(posterUrl(it)) }
     }
 
     /** The profile picture of the user. The server answers with an error when there is none. */

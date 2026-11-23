@@ -12,8 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.github.beal1031.fin2go.ui.home.HomeScreen
-import io.github.beal1031.fin2go.ui.home.HomeViewModel
+import io.github.beal1031.fin2go.ui.AppNavigation
 import io.github.beal1031.fin2go.ui.login.LoginScreen
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
@@ -33,12 +32,13 @@ class MainActivity : ComponentActivity() {
                         // Shown only for a moment while the saved account is read.
                         AppState.Loading -> Unit
                         AppState.SignedOut -> LoginScreen(modifier = contentModifier)
-                        is AppState.SignedIn -> HomeScreen(
+                        // After a new login the navigation starts again from home, with fresh
+                        // ViewModels, so nothing of the previous account remains.
+                        is AppState.SignedIn -> AppNavigation(
+                            userName = current.account.userName,
+                            profileImageUrl = current.profileImageUrl,
                             onSignOut = appViewModel::signOut,
                             modifier = contentModifier,
-                            // A new login gets a new token and with it a fresh HomeViewModel,
-                            // so no rows of the previous account remain.
-                            viewModel = viewModel<HomeViewModel>(key = current.account.accessToken),
                         )
                     }
                 }

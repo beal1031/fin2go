@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -30,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpOffset
@@ -43,20 +46,34 @@ import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
-/** The bar at the top of the app: "Fin2Go" on the left, the round profile picture with its menu on the right. */
+/**
+ * The bar at the top of the app: the title on the left, the round profile picture with its menu on the right.
+ * Without [title], "Fin2Go" is shown. With [onBack], a back arrow comes before the title.
+ */
 @Composable
 fun AppTopBar(
     userName: String,
     profileImageUrl: String?,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
+    onBack: (() -> Unit)? = null,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            // The arrow button has 8dp space around the icon, so the icon starts where "Fin2Go" starts.
+            .padding(start = if (onBack != null) 8.dp else 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (onBack != null) {
+            // 40dp like the profile picture, so the bar is exactly as high as on home.
+            IconButton(onClick = onBack, modifier = Modifier.size(40.dp)) {
+                Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+            }
+        }
         Text(
-            text = stringResource(R.string.app_name),
+            text = title ?: stringResource(R.string.app_name),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f),
         )
@@ -126,7 +143,7 @@ private fun ProfileImage(userName: String, imageUrl: String?, modifier: Modifier
  */
 @OptIn(ExperimentalCoilApi::class)
 @Composable
-private fun AppTopBarPreview(withPicture: Boolean, menuOpen: Boolean = false) {
+private fun AppTopBarPreview(withPicture: Boolean, menuOpen: Boolean = false, withBack: Boolean = false) {
     Fin2goTheme {
         val pictureColor = MaterialTheme.colorScheme.tertiary.toArgb()
         val previewHandler = AsyncImagePreviewHandler { ColorImage(pictureColor) }
@@ -138,6 +155,8 @@ private fun AppTopBarPreview(withPicture: Boolean, menuOpen: Boolean = false) {
                         userName = "sen",
                         profileImageUrl = if (withPicture) "https://example.com/user.jpg" else null,
                         onSignOut = {},
+                        title = if (withBack) stringResource(R.string.series) else null,
+                        onBack = if (withBack) ({}) else null,
                     )
                     // The real menu is a popup, which the static preview does not draw.
                     // So the same entries are drawn here in a box that looks like the menu.
@@ -178,3 +197,13 @@ private fun AppTopBarMenuPreview() = AppTopBarPreview(withPicture = true, menuOp
 @Preview(name = "3d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
 @Composable
 private fun AppTopBarLanguagesPreview() = AppTopBarPreview(withPicture = true, menuOpen = true)
+
+@Preview(name = "4 With back arrow and title", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun AppTopBarBackPreview() = AppTopBarPreview(withPicture = true, withBack = true)
+
+@Preview(name = "4b German", showSystemUi = true, device = PREVIEW_PHONE, locale = "de")
+@Preview(name = "4c French", showSystemUi = true, device = PREVIEW_PHONE, locale = "fr")
+@Preview(name = "4d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
+@Composable
+private fun AppTopBarBackLanguagesPreview() = AppTopBarPreview(withPicture = true, withBack = true)
