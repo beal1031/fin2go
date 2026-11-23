@@ -1,12 +1,18 @@
 package io.github.beal1031.fin2go.ui.login
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -72,78 +79,91 @@ fun LoginContent(
     onCancelQuickConnect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
+    // imePadding: the open keyboard is subtracted, so the content is centered in the visible area above it.
+    BoxWithConstraints(modifier = modifier.fillMaxSize().imePadding()) {
+        // Scrolls when the content does not fit (small screen, landscape, keyboard open).
+        // heightIn keeps it centered when it does fit.
         Column(
-            modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .heightIn(min = maxHeight)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            when {
-                state.serverUrl == null -> {
-                    OutlinedTextField(
-                        value = state.address,
-                        onValueChange = onAddressChange,
-                        label = { Text(stringResource(R.string.login_server_address)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Button(onClick = onConnect, enabled = !state.busy) {
-                        Text(stringResource(R.string.login_connect))
-                    }
-                }
-
-                state.quickConnectCode != null -> {
-                    Text(stringResource(R.string.login_quick_connect_instructions), textAlign = TextAlign.Center)
-                    Text(
-                        text = state.quickConnectCode,
-                        style = MaterialTheme.typography.displayMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(stringResource(R.string.login_quick_connect_waiting), style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = onCancelQuickConnect) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                }
-
-                else -> {
-                    Text(stringResource(R.string.login_connected_to, state.serverName.orEmpty()))
-                    OutlinedTextField(
-                        value = state.username,
-                        onValueChange = onUsernameChange,
-                        label = { Text(stringResource(R.string.login_username)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = state.password,
-                        onValueChange = onPasswordChange,
-                        label = { Text(stringResource(R.string.login_password)) },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    Button(onClick = onLogin, enabled = !state.busy) {
-                        Text(stringResource(R.string.login_sign_in))
-                    }
-                    if (state.quickConnectEnabled) {
-                        OutlinedButton(onClick = onStartQuickConnect, enabled = !state.busy) {
-                            Text(stringResource(R.string.login_quick_connect))
+            Column(
+                modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                when {
+                    state.serverUrl == null -> {
+                        OutlinedTextField(
+                            value = state.address,
+                            onValueChange = onAddressChange,
+                            label = { Text(stringResource(R.string.login_server_address)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+                            keyboardActions = KeyboardActions(onGo = { onConnect() }),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Button(onClick = onConnect, enabled = !state.busy) {
+                            Text(stringResource(R.string.login_connect))
                         }
                     }
-                    TextButton(onClick = onChangeServer) {
-                        Text(stringResource(R.string.login_change_server))
+
+                    state.quickConnectCode != null -> {
+                        Text(stringResource(R.string.login_quick_connect_instructions), textAlign = TextAlign.Center)
+                        Text(
+                            text = state.quickConnectCode,
+                            style = MaterialTheme.typography.displayMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(stringResource(R.string.login_quick_connect_waiting), style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = onCancelQuickConnect) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
+
+                    else -> {
+                        Text(stringResource(R.string.login_connected_to, state.serverName.orEmpty()))
+                        OutlinedTextField(
+                            value = state.username,
+                            onValueChange = onUsernameChange,
+                            label = { Text(stringResource(R.string.login_username)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = state.password,
+                            onValueChange = onPasswordChange,
+                            label = { Text(stringResource(R.string.login_password)) },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { onLogin() }),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Button(onClick = onLogin, enabled = !state.busy) {
+                            Text(stringResource(R.string.login_sign_in))
+                        }
+                        if (state.quickConnectEnabled) {
+                            OutlinedButton(onClick = onStartQuickConnect, enabled = !state.busy) {
+                                Text(stringResource(R.string.login_quick_connect))
+                            }
+                        }
+                        TextButton(onClick = onChangeServer) {
+                            Text(stringResource(R.string.login_change_server))
+                        }
                     }
                 }
-            }
 
-            if (state.busy) CircularProgressIndicator()
-            state.error?.let {
-                Text(stringResource(it), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                if (state.busy) CircularProgressIndicator()
+                state.error?.let {
+                    Text(stringResource(it), color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                }
             }
         }
     }
@@ -157,7 +177,7 @@ private fun LoginPreview(state: LoginState) {
         // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             LoginContent(
-                modifier = Modifier.padding(innerPadding),
+                modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
                 state = state,
                 onAddressChange = {},
                 onConnect = {},

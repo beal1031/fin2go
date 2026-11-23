@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -25,7 +26,8 @@ class MainActivity : ComponentActivity() {
                 val state by appViewModel.state.collectAsState()
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    val contentModifier = Modifier.padding(innerPadding)
+                    // consumeWindowInsets: the bars handled here are not added again by imePadding.
+                    val contentModifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding)
                     when (val current = state) {
                         // Shown only for a moment while the saved account is read.
                         AppState.Loading -> Unit

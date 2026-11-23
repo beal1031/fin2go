@@ -2,6 +2,7 @@ package io.github.beal1031.fin2go.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -48,7 +49,7 @@ private fun SignedInScreenPreview() {
         // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             SignedInScreen(
-                modifier = Modifier.padding(innerPadding),
+                modifier = Modifier.padding(innerPadding).consumeWindowInsets(innerPadding),
                 account = Account(
                     serverId = "1",
                     serverUrl = "http://192.168.1.10:8096",
