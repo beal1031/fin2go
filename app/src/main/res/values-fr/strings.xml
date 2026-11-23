@@ -47,4 +47,27 @@
     <string name="runtime_hours_minutes">%1$d h %2$d min</string>
     <string name="runtime_hours">%1$d h</string>
     <string name="runtime_minutes">%1$d min</string>
+
+    <!-- Series detail page -->
+    <string name="series_seasons">Saisons</string>
+    <string name="series_episodes">Épisodes</string>
+    <string name="series_season_number">Saison %1$d</string>
+    <string name="series_specials">Épisodes spéciaux</string>
+    <string name="series_special">Épisode spécial</string>
+    <string name="series_episode_details">Afficher les détails</string>
+    <string name="series_mark_season_watched">Marquer la saison comme vue</string>
+    <string name="series_mark_season_unwatched">Marquer la saison comme non vue</string>
+    <string name="series_confirm_watched_title">Marquer « %1$s » comme vu ?</string>
+    <string name="series_confirm_unwatched_title">Marquer « %1$s » comme non vu ?</string>
+    <plurals name="series_confirm_watched_text">
+        <item quantity="one">%1$d épisode sera marqué comme vu.</item>
+        <item quantity="many">%1$d épisodes seront marqués comme vus.</item>
+        <item quantity="other">%1$d épisodes seront marqués comme vus.</item>
+    </plurals>
+    <plurals name="series_confirm_unwatched_text">
+        <item quantity="one">%1$d épisode sera marqué comme non vu.</item>
+        <item quantity="many">%1$d épisodes seront marqués comme non vus.</item>
+        <item quantity="other">%1$d épisodes seront marqués comme non vus.</item>
+    </plurals>
+    <string name="series_confirm_mark">Marquer</string>
 </resources>

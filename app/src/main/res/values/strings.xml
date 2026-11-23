@@ -51,4 +51,31 @@
     <string name="runtime_hours_minutes">%1$d h %2$d min</string>
     <string name="runtime_hours">%1$d h</string>
     <string name="runtime_minutes">%1$d min</string>
+
+    <!-- Series detail page -->
+    <string name="series_seasons">Seasons</string>
+    <string name="series_episodes">Episodes</string>
+    <!-- Read out for a season tile, e.g. "Season 2" -->
+    <string name="series_season_number">Season %1$d</string>
+    <!-- Episodes outside the normal seasons (season 0) -->
+    <string name="series_specials">Specials</string>
+    <!-- Short mark on the specials tile -->
+    <string name="series_specials_short" translatable="false">S</string>
+    <!-- One episode of the specials -->
+    <string name="series_special">Special</string>
+    <string name="series_episode_details">Show details</string>
+    <string name="series_mark_season_watched">Mark season as watched</string>
+    <string name="series_mark_season_unwatched">Mark season as not watched</string>
+    <!-- Question before marking a whole season; %1$s is "Season 2" or "Specials" -->
+    <string name="series_confirm_watched_title">Mark %1$s as watched?</string>
+    <string name="series_confirm_unwatched_title">Mark %1$s as not watched?</string>
+    <plurals name="series_confirm_watched_text">
+        <item quantity="one">%1$d episode will be marked as watched.</item>
+        <item quantity="other">%1$d episodes will be marked as watched.</item>
+    </plurals>
+    <plurals name="series_confirm_unwatched_text">
+        <item quantity="one">%1$d episode will be marked as not watched.</item>
+        <item quantity="other">%1$d episodes will be marked as not watched.</item>
+    </plurals>
+    <string name="series_confirm_mark">Mark</string>
 </resources>

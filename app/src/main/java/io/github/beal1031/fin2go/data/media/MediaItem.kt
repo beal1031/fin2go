@@ -5,6 +5,8 @@ data class MediaItem(
     val id: String,
     /** Movie or series name. For an episode: the name of its series. */
     val title: String,
+    /** Only set for episodes: the series they belong to. */
+    val seriesId: String? = null,
     /** Only set for episodes. */
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,

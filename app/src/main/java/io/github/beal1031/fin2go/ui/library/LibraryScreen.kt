@@ -43,6 +43,7 @@ import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 fun LibraryScreen(
     type: LibraryType,
     onOpenMovie: (MediaItem) -> Unit,
+    onOpenSeries: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     // The ViewModel needs to know which list to load, so it is created here with the type.
     viewModel: LibraryViewModel = viewModel { LibraryViewModel(checkNotNull(this[APPLICATION_KEY]), type) },
@@ -56,13 +57,14 @@ fun LibraryScreen(
         state = state,
         onRetry = viewModel::reload,
         onOpenMovie = onOpenMovie,
+        onOpenSeries = onOpenSeries,
         modifier = modifier,
     )
 }
 
 /**
  * The pure UI: the poster grid, or loading, error or empty. The top bar is above it, in AppNavigation.
- * A tap on a movie opens its detail page; series do not react yet.
+ * A tap on a movie or series opens its detail page.
  */
 @Composable
 fun LibraryContent(
@@ -70,6 +72,7 @@ fun LibraryContent(
     state: LibraryState,
     onRetry: () -> Unit,
     onOpenMovie: (MediaItem) -> Unit,
+    onOpenSeries: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -98,7 +101,7 @@ fun LibraryContent(
                         MediaTile(
                             item = item,
                             wide = false,
-                            onClick = if (type == LibraryType.MOVIES) ({ onOpenMovie(item) }) else null,
+                            onClick = { if (type == LibraryType.MOVIES) onOpenMovie(item) else onOpenSeries(item) },
                         )
                     }
                 }
@@ -166,7 +169,7 @@ private fun LibraryPreview(type: LibraryType, state: LibraryState) {
                         title = stringResource(type.title),
                         onBack = {},
                     )
-                    LibraryContent(type = type, state = state, onRetry = {}, onOpenMovie = {})
+                    LibraryContent(type = type, state = state, onRetry = {}, onOpenMovie = {}, onOpenSeries = {})
                 }
             }
         }

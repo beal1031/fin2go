@@ -47,6 +47,7 @@ fun HomeScreen(
     onShowAllSeries: () -> Unit,
     onShowAllMovies: () -> Unit,
     onOpenMovie: (MediaItem) -> Unit,
+    onOpenSeries: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
@@ -60,13 +61,14 @@ fun HomeScreen(
         onShowAllSeries = onShowAllSeries,
         onShowAllMovies = onShowAllMovies,
         onOpenMovie = onOpenMovie,
+        onOpenSeries = onOpenSeries,
         modifier = modifier,
     )
 }
 
 /**
  * The pure UI: the rows, or loading, error or empty. The top bar is above it, in AppNavigation.
- * A tap on a movie opens its detail page. In "Continue watching" a tap will start playing (later),
+ * A tap on a movie or series opens its detail page. In "Continue watching" a tap will start playing (later),
  * so there a long press opens the detail page.
  */
 @Composable
@@ -76,6 +78,7 @@ fun HomeContent(
     onShowAllSeries: () -> Unit,
     onShowAllMovies: () -> Unit,
     onOpenMovie: (MediaItem) -> Unit,
+    onOpenSeries: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -102,14 +105,20 @@ fun HomeContent(
                             stringResource(R.string.home_continue_watching),
                             state.continueWatching,
                             wide = true,
-                            // Episodes have no detail page yet, so only movies react.
-                            onItemLongClick = { item -> if (item.seasonNumber == null) onOpenMovie(item) },
+                            // An episode opens the page of its series, with this episode chosen.
+                            onItemLongClick = { item -> if (item.seriesId != null) onOpenSeries(item) else onOpenMovie(item) },
                         )
                     }
                 }
                 if (state.latestSeries.isNotEmpty()) {
                     item {
-                        MediaRow(stringResource(R.string.series), state.latestSeries, wide = false, onShowAll = onShowAllSeries)
+                        MediaRow(
+                            stringResource(R.string.series),
+                            state.latestSeries,
+                            wide = false,
+                            onShowAll = onShowAllSeries,
+                            onItemClick = onOpenSeries,
+                        )
                     }
                 }
                 if (state.latestMovies.isNotEmpty()) {
@@ -244,6 +253,7 @@ private fun HomePreview(state: HomeState) {
                         onShowAllSeries = {},
                         onShowAllMovies = {},
                         onOpenMovie = {},
+                        onOpenSeries = {},
                     )
                 }
             }

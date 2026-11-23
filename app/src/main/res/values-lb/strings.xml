@@ -49,4 +49,25 @@
     <string name="runtime_hours_minutes">%1$d St. %2$d Min.</string>
     <string name="runtime_hours">%1$d St.</string>
     <string name="runtime_minutes">%1$d Min.</string>
+
+    <!-- Series detail page -->
+    <string name="series_seasons">Staffelen</string>
+    <string name="series_episodes">Episoden</string>
+    <string name="series_season_number">Staffel %1$d</string>
+    <string name="series_specials">Specials</string>
+    <string name="series_special">Special</string>
+    <string name="series_episode_details">Detailer weisen</string>
+    <string name="series_mark_season_watched">Staffel als gesinn markéieren</string>
+    <string name="series_mark_season_unwatched">Staffel als net gesinn markéieren</string>
+    <string name="series_confirm_watched_title">%1$s als gesinn markéieren?</string>
+    <string name="series_confirm_unwatched_title">%1$s als net gesinn markéieren?</string>
+    <plurals name="series_confirm_watched_text">
+        <item quantity="one">%1$d Episod gëtt als gesinn markéiert.</item>
+        <item quantity="other">%1$d Episoden ginn als gesinn markéiert.</item>
+    </plurals>
+    <plurals name="series_confirm_unwatched_text">
+        <item quantity="one">%1$d Episod gëtt als net gesinn markéiert.</item>
+        <item quantity="other">%1$d Episoden ginn als net gesinn markéiert.</item>
+    </plurals>
+    <string name="series_confirm_mark">Markéieren</string>
 </resources>

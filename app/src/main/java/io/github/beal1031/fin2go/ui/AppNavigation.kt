@@ -28,6 +28,7 @@ import io.github.beal1031.fin2go.ui.home.HomeScreen
 import io.github.beal1031.fin2go.ui.library.LibraryScreen
 import io.github.beal1031.fin2go.ui.library.LibraryType
 import io.github.beal1031.fin2go.ui.movie.MovieScreen
+import io.github.beal1031.fin2go.ui.series.SeriesScreen
 import kotlinx.serialization.Serializable
 
 /** The home screen, where the app starts after sign-in. */
@@ -41,6 +42,10 @@ data class LibraryRoute(val type: LibraryType)
 /** The detail page of one movie. */
 @Serializable
 data class MovieRoute(val id: String)
+
+/** The detail page of one series. With [episodeId], that episode is chosen; otherwise the one the user is at. */
+@Serializable
+data class SeriesRoute(val id: String, val episodeId: String? = null)
 
 /**
  * All screens after sign-in and how to get from one to the other.
@@ -62,8 +67,10 @@ fun AppNavigation(
     val currentEntry by navController.currentBackStackEntryAsState()
     val entry = currentEntry
     val onHome = entry == null || entry.destination.hasRoute<HomeRoute>()
-    val onMovie = entry != null && entry.destination.hasRoute<MovieRoute>()
-    // In a list: its name. On the movie page: none, the title is big below the picture.
+    // The detail pages let their picture run behind the bar.
+    val onDetailPage = entry != null &&
+        (entry.destination.hasRoute<MovieRoute>() || entry.destination.hasRoute<SeriesRoute>())
+    // In a list: its name. On a detail page: none, the title is big below the picture.
     val title = entry
         ?.takeIf { it.destination.hasRoute<LibraryRoute>() }
         ?.let { stringResource(it.toRoute<LibraryRoute>().type.title) }
@@ -71,6 +78,11 @@ fun AppNavigation(
     // So a fast double tap opens a page only once, while a tap on another page always works at once.
     val open = { route: Any -> navController.navigate(route) { launchSingleTop = true } }
     val openMovie = { item: MediaItem -> open(MovieRoute(item.id)) }
+    // A series opens its page; an episode opens the page of its series with this episode chosen.
+    val openSeries = { item: MediaItem ->
+        val seriesId = item.seriesId
+        open(if (seriesId != null) SeriesRoute(seriesId, episodeId = item.id) else SeriesRoute(item.id))
+    }
     // Goes back only from the page the arrow belongs to, so a double tap goes back just one step.
     val back = { from: NavBackStackEntry ->
         if (navController.currentBackStackEntry?.id == from.id) navController.popBackStack()
@@ -85,14 +97,24 @@ fun AppNavigation(
                     onShowAllSeries = { open(LibraryRoute(LibraryType.SERIES)) },
                     onShowAllMovies = { open(LibraryRoute(LibraryType.MOVIES)) },
                     onOpenMovie = openMovie,
+                    onOpenSeries = openSeries,
                     modifier = belowBar,
                 )
             }
             composable<LibraryRoute> { entry ->
-                LibraryScreen(type = entry.toRoute<LibraryRoute>().type, onOpenMovie = openMovie, modifier = belowBar)
+                LibraryScreen(
+                    type = entry.toRoute<LibraryRoute>().type,
+                    onOpenMovie = openMovie,
+                    onOpenSeries = openSeries,
+                    modifier = belowBar,
+                )
             }
             composable<MovieRoute> { entry ->
                 MovieScreen(movieId = entry.toRoute<MovieRoute>().id, statusBarHeight = statusBarHeight)
+            }
+            composable<SeriesRoute> { entry ->
+                val route = entry.toRoute<SeriesRoute>()
+                SeriesScreen(seriesId = route.id, episodeId = route.episodeId, statusBarHeight = statusBarHeight)
             }
         }
 
@@ -103,7 +125,7 @@ fun AppNavigation(
             onSignOut = onSignOut,
             title = title,
             onBack = if (!onHome && entry != null) ({ back(entry) }) else null,
-            onPicture = onMovie,
+            onPicture = onDetailPage,
             modifier = Modifier.padding(top = statusBarHeight),
         )
 

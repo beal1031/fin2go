@@ -13,6 +13,7 @@ import org.jellyfin.sdk.api.client.extensions.userDataApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.SortOrder
@@ -50,8 +51,11 @@ class MediaRepository(context: Context) {
             }
             started.await() to nextUp.await()
         }
-        val seriesWithStartedEpisode = started.mapNotNull { it.seriesId }.toSet()
-        (started + nextUp.filter { it.seriesId !in seriesWithStartedEpisode })
+        // Two started episodes of one series: only the most recently watched one stays.
+        // The server sends the most recently watched first, and distinctBy keeps the first of each series.
+        val startedOnce = started.distinctBy { it.seriesId ?: it.id }
+        val seriesWithStartedEpisode = startedOnce.mapNotNull { it.seriesId }.toSet()
+        (startedOnce + nextUp.filter { it.seriesId !in seriesWithStartedEpisode })
             .take(limit)
             .map { it.toMediaItem(wideImageUrl(it)) }
     }
@@ -100,17 +104,103 @@ class MediaRepository(context: Context) {
             id = item.id.toString(),
             title = item.name.orEmpty(),
             year = item.productionYear,
-            // The server counts in ticks of 100 nanoseconds: 600,000,000 ticks are one minute.
-            runtimeMinutes = item.runTimeTicks?.let { ((it + 300_000_000L) / 600_000_000L).toInt() },
+            runtimeMinutes = item.runTimeTicks?.let(::minutes),
             ageRating = item.officialRating?.takeIf { it.isNotBlank() },
             genres = item.genres.orEmpty(),
             overview = item.overview?.takeIf { it.isNotBlank() },
             backdropUrl = item.backdropImageTags?.firstOrNull()?.let { imageUrl(item.id, ImageType.BACKDROP, it, 1280) },
             posterUrl = posterUrl(item),
             progress = startedRuntime?.let { (position.toFloat() / it).coerceIn(0f, 1f) },
-            remainingMinutes = startedRuntime?.let { ((it - position + 300_000_000L) / 600_000_000L).toInt().coerceAtLeast(1) },
+            remainingMinutes = startedRuntime?.let { minutes(it - position).coerceAtLeast(1) },
             watched = startedRuntime == null && item.userData?.played == true,
         )
+    }
+
+    /**
+     * All details of one series with all its episodes, for the detail page.
+     * Episodes come in watching order: season 1, 2, … and the specials (season 0) last.
+     */
+    suspend fun series(id: String): SeriesDetails = withContext(Dispatchers.IO) {
+        val seriesId = UUID.fromString(id)
+        val (item, episodeItems) = coroutineScope {
+            val item = async { api.libraryApi.getItem(itemId = seriesId).content }
+            val episodes = async {
+                api.showApi.getEpisodes(
+                    seriesId = seriesId,
+                    // The description of an episode is only sent when asked for.
+                    fields = listOf(ItemFields.OVERVIEW),
+                    // Episodes the server only knows from the internet, without a file, are left out.
+                    isMissing = false,
+                    enableUserData = true,
+                ).content.items
+            }
+            item.await() to episodes.await()
+        }
+        val episodes = episodeItems
+            // Without a season number, an episode counts as season 1.
+            .groupBy { it.parentIndexNumber ?: 1 }
+            // Specials (0) last, the other seasons by number.
+            .toSortedMap(compareBy<Int> { it == 0 }.thenBy { it })
+            .flatMap { (season, items) ->
+                // Without an episode number, the place in the season is used.
+                items.mapIndexed { index, episode -> episode.toEpisode(season, episode.indexNumber ?: (index + 1)) }
+            }
+        val firstYear = item.productionYear
+        val lastYear = item.endDate?.year
+        // e.g. "2010–2015", "2010–" while it still runs, or "2010" for one year.
+        val years = when {
+            firstYear == null -> null
+            item.status == "Continuing" -> "$firstYear–"
+            lastYear != null && lastYear != firstYear -> "$firstYear–$lastYear"
+            else -> firstYear.toString()
+        }
+        SeriesDetails(
+            id = item.id.toString(),
+            title = item.name.orEmpty(),
+            years = years,
+            ageRating = item.officialRating?.takeIf { it.isNotBlank() },
+            genres = item.genres.orEmpty(),
+            overview = item.overview?.takeIf { it.isNotBlank() },
+            backdropUrl = item.backdropImageTags?.firstOrNull()?.let { imageUrl(item.id, ImageType.BACKDROP, it, 1280) },
+            posterUrl = posterUrl(item),
+            episodes = episodes.map { it.details },
+            currentEpisodeId = currentEpisode(episodes)?.id,
+        )
+    }
+
+    /** An episode and when it was last watched; the time is only needed to find the current episode. */
+    private class Episode(val details: EpisodeDetails, val lastPlayed: LocalDateTime?)
+
+    private fun BaseItemDto.toEpisode(season: Int, number: Int): Episode {
+        val position = userData?.playbackPositionTicks ?: 0L
+        // As for movies: a saved position means started, even when it was watched before.
+        val startedRuntime = runTimeTicks?.takeIf { it > 0L && position > 0L }
+        val details = EpisodeDetails(
+            id = id.toString(),
+            seasonNumber = season,
+            episodeNumber = number,
+            title = name.orEmpty(),
+            runtimeMinutes = runTimeTicks?.let(::minutes),
+            overview = overview?.takeIf { it.isNotBlank() },
+            imageUrl = wideImageUrl(this),
+            progress = startedRuntime?.let { (position.toFloat() / it).coerceIn(0f, 1f) },
+            remainingMinutes = startedRuntime?.let { minutes(it - position).coerceAtLeast(1) },
+            watched = startedRuntime == null && userData?.played == true,
+        )
+        return Episode(details, userData?.lastPlayedDate)
+    }
+
+    /**
+     * The episode the user is at: the last watched one if it is only started, else the one after it.
+     * Nothing watched yet: the first episode. The very last episode watched to the end: that one stays.
+     */
+    private fun currentEpisode(episodes: List<Episode>): EpisodeDetails? {
+        val lastIndex = episodes.indices
+            .filter { episodes[it].lastPlayed != null }
+            .maxByOrNull { episodes[it].lastPlayed!! }
+            ?: return episodes.firstOrNull()?.details
+        val last = episodes[lastIndex].details
+        return if (last.watched) episodes.getOrNull(lastIndex + 1)?.details ?: last else last
     }
 
     /** Marks a movie or episode as fully watched, or as not watched. */
@@ -139,6 +229,7 @@ class MediaRepository(context: Context) {
         return MediaItem(
             id = id.toString(),
             title = (if (isEpisode) seriesName else null) ?: name.orEmpty(),
+            seriesId = if (isEpisode) seriesId?.toString() else null,
             seasonNumber = if (isEpisode) parentIndexNumber else null,
             episodeNumber = if (isEpisode) indexNumber else null,
             imageUrl = imageUrl,
@@ -168,6 +259,9 @@ class MediaRepository(context: Context) {
         if (parentId != null && parentTag != null) return imageUrl(parentId, ImageType.BACKDROP, parentTag, 600)
         return posterUrl(item)
     }
+
+    /** The server counts in ticks of 100 nanoseconds: 600,000,000 ticks are one minute. Rounded. */
+    private fun minutes(ticks: Long): Int = ((ticks + 300_000_000L) / 600_000_000L).toInt()
 
     private fun imageUrl(itemId: UUID, type: ImageType, tag: String, maxWidth: Int): String =
         api.imageApi.getItemImageUrl(itemId = itemId, imageType = type, tag = tag, maxWidth = maxWidth)
