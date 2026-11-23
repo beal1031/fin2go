@@ -33,4 +33,11 @@
     <!-- Library: all series or all movies -->
     <string name="library_empty_series">Il n’y a pas encore de séries sur le serveur.</string>
     <string name="library_empty_movies">Il n’y a pas encore de films sur le serveur.</string>
+
+    <!-- Movie detail page -->
+    <string name="movie_play">Lire</string>
+    <!-- Running time, e.g. 2 h 12 min -->
+    <string name="runtime_hours_minutes">%1$d h %2$d min</string>
+    <string name="runtime_hours">%1$d h</string>
+    <string name="runtime_minutes">%1$d min</string>
 </resources>

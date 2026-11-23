@@ -88,6 +88,23 @@ class MediaRepository(context: Context) {
             .map { it.toMediaItem(posterUrl(it)) }
     }
 
+    /** All details of one movie for the detail page. */
+    suspend fun movie(id: String): MovieDetails = withContext(Dispatchers.IO) {
+        val item = api.libraryApi.getItem(itemId = UUID.fromString(id)).content
+        MovieDetails(
+            id = item.id.toString(),
+            title = item.name.orEmpty(),
+            year = item.productionYear,
+            // The server counts in ticks of 100 nanoseconds: 600,000,000 ticks are one minute.
+            runtimeMinutes = item.runTimeTicks?.let { ((it + 300_000_000L) / 600_000_000L).toInt() },
+            ageRating = item.officialRating?.takeIf { it.isNotBlank() },
+            genres = item.genres.orEmpty(),
+            overview = item.overview?.takeIf { it.isNotBlank() },
+            backdropUrl = item.backdropImageTags?.firstOrNull()?.let { imageUrl(item.id, ImageType.BACKDROP, it, 1280) },
+            posterUrl = posterUrl(item),
+        )
+    }
+
     /** The profile picture of the user. The server answers with an error when there is none. */
     fun profileImageUrl(userId: String): String =
         api.imageApi.getUserImageUrl(userId = UUID.fromString(userId))

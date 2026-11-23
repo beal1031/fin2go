@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.ui.AppNavigation
+import io.github.beal1031.fin2go.ui.withoutTop
 import io.github.beal1031.fin2go.ui.login.LoginScreen
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 
@@ -40,11 +41,15 @@ class MainActivity : ComponentActivity() {
                         AppState.SignedOut -> LoginScreen(modifier = contentModifier)
                         // After a new login the navigation starts again from home, with fresh
                         // ViewModels, so nothing of the previous account remains.
+                        // The status bar space is left to AppNavigation, so pictures can run behind the status bar.
                         is AppState.SignedIn -> AppNavigation(
                             userName = current.account.userName,
                             profileImageUrl = current.profileImageUrl,
                             onSignOut = appViewModel::signOut,
-                            modifier = contentModifier,
+                            statusBarHeight = innerPadding.calculateTopPadding(),
+                            modifier = Modifier
+                                .padding(innerPadding.withoutTop())
+                                .consumeWindowInsets(innerPadding),
                         )
                     }
                 }

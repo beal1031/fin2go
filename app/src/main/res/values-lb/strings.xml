@@ -35,4 +35,11 @@
     <!-- Library: all series or all movies -->
     <string name="library_empty_series">Um Server ginn et nach keng Serien.</string>
     <string name="library_empty_movies">Um Server ginn et nach keng Filmer.</string>
+
+    <!-- Movie detail page -->
+    <string name="movie_play">Ofspillen</string>
+    <!-- Running time, e.g. 2 St. 12 Min. -->
+    <string name="runtime_hours_minutes">%1$d St. %2$d Min.</string>
+    <string name="runtime_hours">%1$d St.</string>
+    <string name="runtime_minutes">%1$d Min.</string>
 </resources>

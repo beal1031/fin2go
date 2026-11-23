@@ -1,6 +1,7 @@
 package io.github.beal1031.fin2go.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,11 +39,24 @@ import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 /**
  * Wide tile (16:9, with progress bar) or poster tile (2:3), with the title below.
  * The width comes from [modifier]: fixed in a row, the cell width in a grid.
+ * Without [onClick] and [onLongClick], the tile does not react to touch.
  */
 @Composable
-fun MediaTile(item: MediaItem, wide: Boolean, modifier: Modifier = Modifier) {
+fun MediaTile(
+    item: MediaItem,
+    wide: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+) {
     Column(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (onClick != null || onLongClick != null) {
+                Modifier.combinedClickable(onClick = { onClick?.invoke() }, onLongClick = onLongClick)
+            } else {
+                Modifier
+            }
+        ),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(

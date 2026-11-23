@@ -44,6 +44,7 @@ import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 fun HomeScreen(
     onShowAllSeries: () -> Unit,
     onShowAllMovies: () -> Unit,
+    onOpenMovie: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = viewModel(),
 ) {
@@ -54,17 +55,23 @@ fun HomeScreen(
         onRetry = viewModel::reload,
         onShowAllSeries = onShowAllSeries,
         onShowAllMovies = onShowAllMovies,
+        onOpenMovie = onOpenMovie,
         modifier = modifier,
     )
 }
 
-/** The pure UI: the rows, or loading, error or empty. The top bar is above it, in AppNavigation. */
+/**
+ * The pure UI: the rows, or loading, error or empty. The top bar is above it, in AppNavigation.
+ * A tap on a movie opens its detail page. In "Continue watching" a tap will start playing (later),
+ * so there a long press opens the detail page.
+ */
 @Composable
 fun HomeContent(
     state: HomeState,
     onRetry: () -> Unit,
     onShowAllSeries: () -> Unit,
     onShowAllMovies: () -> Unit,
+    onOpenMovie: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -86,7 +93,15 @@ fun HomeContent(
             ) {
                 // A row without items is not shown at all.
                 if (state.continueWatching.isNotEmpty()) {
-                    item { MediaRow(stringResource(R.string.home_continue_watching), state.continueWatching, wide = true) }
+                    item {
+                        MediaRow(
+                            stringResource(R.string.home_continue_watching),
+                            state.continueWatching,
+                            wide = true,
+                            // Episodes have no detail page yet, so only movies react.
+                            onItemLongClick = { item -> if (item.seasonNumber == null) onOpenMovie(item) },
+                        )
+                    }
                 }
                 if (state.latestSeries.isNotEmpty()) {
                     item {
@@ -95,7 +110,13 @@ fun HomeContent(
                 }
                 if (state.latestMovies.isNotEmpty()) {
                     item {
-                        MediaRow(stringResource(R.string.movies), state.latestMovies, wide = false, onShowAll = onShowAllMovies)
+                        MediaRow(
+                            stringResource(R.string.movies),
+                            state.latestMovies,
+                            wide = false,
+                            onShowAll = onShowAllMovies,
+                            onItemClick = onOpenMovie,
+                        )
                     }
                 }
             }
@@ -106,9 +127,17 @@ fun HomeContent(
 /**
  * A heading and a row of tiles that scrolls sideways.
  * With [onShowAll], the heading gets an arrow and the whole heading can be tapped.
+ * [onItemClick] and [onItemLongClick] are called with the touched tile's item.
  */
 @Composable
-private fun MediaRow(title: String, items: List<MediaItem>, wide: Boolean, onShowAll: (() -> Unit)? = null) {
+private fun MediaRow(
+    title: String,
+    items: List<MediaItem>,
+    wide: Boolean,
+    onShowAll: (() -> Unit)? = null,
+    onItemClick: ((MediaItem) -> Unit)? = null,
+    onItemLongClick: ((MediaItem) -> Unit)? = null,
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(
             modifier = Modifier
@@ -133,7 +162,13 @@ private fun MediaRow(title: String, items: List<MediaItem>, wide: Boolean, onSho
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             items(items, key = { it.id }) { item ->
-                MediaTile(item = item, wide = wide, modifier = Modifier.width(if (wide) 240.dp else 120.dp))
+                MediaTile(
+                    item = item,
+                    wide = wide,
+                    modifier = Modifier.width(if (wide) 240.dp else 120.dp),
+                    onClick = onItemClick?.let { { it(item) } },
+                    onLongClick = onItemLongClick?.let { { it(item) } },
+                )
             }
         }
     }
@@ -204,6 +239,7 @@ private fun HomePreview(state: HomeState) {
                         onRetry = {},
                         onShowAllSeries = {},
                         onShowAllMovies = {},
+                        onOpenMovie = {},
                     )
                 }
             }

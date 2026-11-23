@@ -40,6 +40,7 @@ import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 @Composable
 fun LibraryScreen(
     type: LibraryType,
+    onOpenMovie: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
     // The ViewModel needs to know which list to load, so it is created here with the type.
     viewModel: LibraryViewModel = viewModel { LibraryViewModel(checkNotNull(this[APPLICATION_KEY]), type) },
@@ -50,16 +51,21 @@ fun LibraryScreen(
         type = type,
         state = state,
         onRetry = viewModel::reload,
+        onOpenMovie = onOpenMovie,
         modifier = modifier,
     )
 }
 
-/** The pure UI: the poster grid, or loading, error or empty. The top bar is above it, in AppNavigation. */
+/**
+ * The pure UI: the poster grid, or loading, error or empty. The top bar is above it, in AppNavigation.
+ * A tap on a movie opens its detail page; series do not react yet.
+ */
 @Composable
 fun LibraryContent(
     type: LibraryType,
     state: LibraryState,
     onRetry: () -> Unit,
+    onOpenMovie: (MediaItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
@@ -85,7 +91,11 @@ fun LibraryContent(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(state.items, key = { it.id }) { item ->
-                        MediaTile(item = item, wide = false)
+                        MediaTile(
+                            item = item,
+                            wide = false,
+                            onClick = if (type == LibraryType.MOVIES) ({ onOpenMovie(item) }) else null,
+                        )
                     }
                 }
             }
@@ -152,7 +162,7 @@ private fun LibraryPreview(type: LibraryType, state: LibraryState) {
                         title = stringResource(type.title),
                         onBack = {},
                     )
-                    LibraryContent(type = type, state = state, onRetry = {})
+                    LibraryContent(type = type, state = state, onRetry = {}, onOpenMovie = {})
                 }
             }
         }
