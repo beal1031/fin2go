@@ -26,12 +26,13 @@ class MediaRepository(context: Context) {
     private val api = JellyfinClient.api(context)
 
     /**
-     * One row for continuing: first the started movies and episodes (most recently watched first),
-     * then the next unwatched episode of series watched in the last 60 days.
-     * Only one entry per series. Shown with a wide image.
+     * One row for continuing: the started movies and episodes, and the next unwatched episode of series
+     * watched in the last 60 days. All together sorted by when they were last watched, newest first;
+     * for a next episode that is when the series was last watched. Only one entry per series.
+     * Fully watched movies and series are not in it. Shown with a wide image.
      */
     suspend fun continueWatching(limit: Int = 20): List<MediaItem> = withContext(Dispatchers.IO) {
-        val (started, nextUp) = coroutineScope {
+        val (started, nextUp, recentlyPlayed) = coroutineScope {
             val started = async {
                 api.libraryApi.getResumeItems(
                     limit = limit,
@@ -49,13 +50,34 @@ class MediaRepository(context: Context) {
                     enableResumable = false,
                 ).content.items
             }
-            started.await() to nextUp.await()
+            // The last watched episodes, to know when each series of the next episodes was last watched.
+            val recentlyPlayed = async {
+                api.libraryApi.getItems(
+                    includeItemTypes = listOf(BaseItemKind.EPISODE),
+                    recursive = true,
+                    sortBy = listOf(ItemSortBy.DATE_PLAYED),
+                    sortOrder = listOf(SortOrder.DESCENDING),
+                    limit = 200,
+                    enableUserData = true,
+                    enableTotalRecordCount = false,
+                ).content.items
+            }
+            Triple(started.await(), nextUp.await(), recentlyPlayed.await())
         }
         // Two started episodes of one series: only the most recently watched one stays.
         // The server sends the most recently watched first, and distinctBy keeps the first of each series.
         val startedOnce = started.distinctBy { it.seriesId ?: it.id }
         val seriesWithStartedEpisode = startedOnce.mapNotNull { it.seriesId }.toSet()
+        // For each series: when one of its episodes was last watched.
+        val seriesLastPlayed = recentlyPlayed
+            .mapNotNull { episode -> episode.seriesId?.let { id -> episode.userData?.lastPlayedDate?.let { id to it } } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, dates) -> dates.max() }
+        val lastPlayed = { item: BaseItemDto ->
+            item.userData?.lastPlayedDate ?: item.seriesId?.let(seriesLastPlayed::get) ?: LocalDateTime.MIN
+        }
         (startedOnce + nextUp.filter { it.seriesId !in seriesWithStartedEpisode })
+            .sortedByDescending(lastPlayed)
             .take(limit)
             .map { it.toMediaItem(wideImageUrl(it)) }
     }
