@@ -94,4 +94,7 @@
     <string name="player_quality_1080" translatable="false">1080p</string>
     <string name="player_quality_720" translatable="false">720p</string>
     <string name="player_quality_480" translatable="false">480p</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_subtitles">Subtitles</string>
+    <string name="player_subtitles_off">Off</string>
 </resources>

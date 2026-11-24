@@ -80,4 +80,7 @@
     <string name="player_speed">Vitess</string>
     <string name="player_quality">Qualitéit</string>
     <string name="player_quality_auto">Automatesch</string>
+    <string name="player_audio">Audio</string>
+    <string name="player_subtitles">Ënnertitelen</string>
+    <string name="player_subtitles_off">Aus</string>
 </resources>

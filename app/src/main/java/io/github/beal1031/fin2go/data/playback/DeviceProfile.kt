@@ -53,8 +53,9 @@ fun deviceProfile(): DeviceProfile {
         }
 
         // Subtitles inside the file are read by the player itself, so they never force a transcode.
-        // Choosing subtitles and loading separate subtitle files come with the settings sheet.
         EMBEDDED_SUBTITLES.forEach { subtitleProfile(it, SubtitleDeliveryMethod.EMBED) }
+        // Text subtitles in a file of their own are loaded next to the video.
+        EXTERNAL_SUBTITLES.forEach { subtitleProfile(it, SubtitleDeliveryMethod.EXTERNAL) }
     }
 }
 
@@ -64,6 +65,8 @@ private const val MAX_BITRATE = 120_000_000
 private val DIRECT_PLAY_CONTAINERS = arrayOf("mkv", "matroska", "webm", "mp4", "m4v", "mov", "ts", "mpegts")
 
 private val EMBEDDED_SUBTITLES = listOf("srt", "subrip", "ass", "ssa", "vtt", "webvtt", "pgs", "pgssub", "dvdsub")
+
+private val EXTERNAL_SUBTITLES = listOf("srt", "subrip", "ass", "ssa", "vtt", "webvtt")
 
 /** Android type of a decoder and the name the server uses for it. */
 private val VIDEO_CODECS = mapOf(

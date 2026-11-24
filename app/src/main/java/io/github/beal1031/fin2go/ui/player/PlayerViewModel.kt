@@ -13,6 +13,11 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.Tracks
+import androidx.core.net.toUri
+import io.github.beal1031.fin2go.data.playback.SubtitleTrack
+import io.github.beal1031.fin2go.data.playback.Track
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -55,6 +60,12 @@ data class PlayerState(
     /** 1 is normal speed. */
     val speed: Float = 1f,
     val quality: Quality = Quality.AUTO,
+    val audioTracks: List<Track> = emptyList(),
+    val subtitleTracks: List<SubtitleTrack> = emptyList(),
+    /** The chosen audio track, by the server's number. */
+    val audioIndex: Int? = null,
+    /** The chosen subtitles, by the server's number; null for none. */
+    val subtitleIndex: Int? = null,
 )
 
 /**
@@ -117,7 +128,18 @@ class PlayerViewModel(
         override fun onPlayerError(error: PlaybackException) {
             _state.update { it.copy(error = true) }
         }
+
+        // The tracks of a new video are known only once it has started loading; then the chosen ones are set.
+        override fun onTracksChanged(tracks: Tracks) {
+            if (!tracksApplied && !tracks.isEmpty) {
+                tracksApplied = true
+                applyTracks()
+            }
+        }
     }
+
+    /** False until the chosen tracks are set on the current video. */
+    private var tracksApplied = false
 
     init {
         player.addListener(listener)
@@ -131,10 +153,8 @@ class PlayerViewModel(
             _state.update { it.copy(loading = true, error = false) }
             try {
                 val prepared = playback.prepare(itemId, fromStart)
-                stream = prepared.stream
                 _state.update { it.copy(loading = false, info = prepared.info) }
-                player.setMediaItem(prepared.stream.toMediaItem(), prepared.startPositionMs)
-                player.prepare()
+                useStream(prepared.stream, prepared.startPositionMs)
                 player.play()
                 playback.reportStart(prepared.stream, prepared.startPositionMs, paused = false)
             } catch (e: CancellationException) {
@@ -168,22 +188,65 @@ class PlayerViewModel(
         _state.update { it.copy(speed = speed) }
     }
 
-    /**
-     * Only for this playback. Asks the server for a new stream in [quality] and continues at the same position;
-     * the old stream is reported as stopped, so the server stops converting it.
-     */
+    /** Only for this playback. Gets a new stream in [quality] from the server, see [switchStream]. */
     fun setQuality(quality: Quality) {
-        val old = stream
-        if (old == null || quality == _state.value.quality) return
-        val position = player.currentPosition
+        if (quality == _state.value.quality) return
         _state.update { it.copy(quality = quality) }
+        switchStream()
+    }
+
+    /**
+     * Plays the audio track with the server's number [index]. The original file has all tracks, so the player
+     * switches at once; a converted stream has only one, so the server has to make a new one.
+     */
+    fun selectAudio(index: Int) {
+        if (index == _state.value.audioIndex) return
+        _state.update { it.copy(audioIndex = index) }
+        if (stream?.directPlay == true) applyTracks() else switchStream()
+    }
+
+    /** Shows the subtitles with the server's number [index], or none for null. Switches like [selectAudio]. */
+    fun selectSubtitles(index: Int?) {
+        if (index == _state.value.subtitleIndex) return
+        _state.update { it.copy(subtitleIndex = index) }
+        if (stream?.directPlay == true) applyTracks() else switchStream()
+    }
+
+    /** Starts [new] at [positionMs]; its tracks are set as soon as the player knows them. */
+    private fun useStream(new: Stream, positionMs: Long) {
+        stream = new
+        tracksApplied = false
+        _state.update {
+            it.copy(
+                audioTracks = new.audioTracks,
+                subtitleTracks = new.subtitleTracks,
+                audioIndex = new.audioIndex,
+                subtitleIndex = new.subtitleIndex,
+            )
+        }
+        player.setMediaItem(new.toMediaItem(), positionMs)
+        player.prepare()
+    }
+
+    /**
+     * Asks the server for a new stream with the chosen quality and tracks and continues at the same position.
+     * The old stream is reported as stopped, so the server stops converting it.
+     */
+    private fun switchStream() {
+        val old = stream ?: return
+        val position = player.currentPosition
+        val chosen = _state.value
         viewModelScope.launch {
             try {
                 playback.reportStopped(old, position)
-                val new = playback.stream(itemId, quality.maxBitrate)
-                stream = new
-                player.setMediaItem(new.toMediaItem(), position)
-                player.prepare()
+                val new = playback.stream(
+                    itemId,
+                    maxBitrate = chosen.quality.maxBitrate,
+                    audioIndex = chosen.audioIndex,
+                    // -1 tells the server: no subtitles.
+                    subtitleIndex = chosen.subtitleIndex ?: -1,
+                )
+                useStream(new, position)
                 playback.reportStart(new, position, paused = !player.playWhenReady)
             } catch (e: CancellationException) {
                 throw e
@@ -191,6 +254,47 @@ class PlayerViewModel(
                 _state.update { it.copy(error = true) }
             }
         }
+    }
+
+    /**
+     * Tells the player which of its tracks to play. The server and the player number the tracks differently;
+     * inside the file both keep the same order, so the n-th audio track of the server is the n-th of the player.
+     * Subtitles in a file of their own carry the server's number in their id (see [toMediaItem]).
+     * In a converted stream the server has already put in the chosen audio, and burned in chosen subtitles
+     * from inside the file.
+     */
+    private fun applyTracks() {
+        val current = stream ?: return
+        val chosen = _state.value
+        val groups = player.currentTracks.groups
+        val parameters = player.trackSelectionParameters.buildUpon()
+
+        if (current.directPlay) {
+            val position = current.audioTracks.indexOfFirst { it.index == chosen.audioIndex }
+            groups.filter { it.type == C.TRACK_TYPE_AUDIO }.getOrNull(position)?.let {
+                parameters.setOverrideForType(TrackSelectionOverride(it.mediaTrackGroup, 0))
+            }
+        }
+
+        val subtitle = current.subtitleTracks.find { it.index == chosen.subtitleIndex }
+        val textGroups = groups.filter { it.type == C.TRACK_TYPE_TEXT }
+        val (ownFiles, inFile) = textGroups.partition { it.getTrackFormat(0).id.orEmpty().contains(EXTERNAL_ID) }
+        val group = when {
+            subtitle == null -> null
+            subtitle.externalUrl != null -> ownFiles.find { it.getTrackFormat(0).id.orEmpty().endsWith(externalId(subtitle.index)) }
+            current.directPlay -> {
+                val position = current.subtitleTracks.filter { it.externalUrl == null }.indexOf(subtitle)
+                inFile.getOrNull(position)
+            }
+            else -> null
+        }
+        if (group == null) {
+            parameters.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+        } else {
+            parameters.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+            parameters.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, 0))
+        }
+        player.trackSelectionParameters = parameters.build()
     }
 
     /** Jumps [byMs] forward, or back when negative, but not before the start or past the end. */
@@ -267,12 +371,30 @@ class PlayerViewModel(
     }
 }
 
-/** Direct play needs only the address; a converted stream must be marked as HLS. */
-private fun Stream.toMediaItem(): MediaItem =
-    MediaItem.Builder()
+/**
+ * Direct play needs only the address; a converted stream must be marked as HLS.
+ * Subtitles in a file of their own are added, each with an id that holds the server's number.
+ */
+private fun Stream.toMediaItem(): MediaItem {
+    val subtitles = subtitleTracks.mapNotNull { track ->
+        val url = track.externalUrl ?: return@mapNotNull null
+        MediaItem.SubtitleConfiguration.Builder(url.toUri())
+            .setMimeType(track.mimeType)
+            .setLabel(track.title)
+            .setId(externalId(track.index))
+            .build()
+    }
+    return MediaItem.Builder()
         .setUri(url)
         .apply { if (!directPlay) setMimeType(MimeTypes.APPLICATION_M3U8) }
+        .setSubtitleConfigurations(subtitles)
         .build()
+}
+
+/** Marks the id of a subtitle file of its own, so the player's track can be found again. */
+private const val EXTERNAL_ID = "server-subtitle-"
+
+private fun externalId(index: Int) = "$EXTERNAL_ID$index"
 
 /**
  * A player that sends the sign-in with every request, pauses on a call or when headphones are unplugged,

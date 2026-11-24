@@ -86,6 +86,8 @@ import androidx.media3.ui.compose.ContentFrame
 import coil3.compose.AsyncImage
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.playback.PlaybackInfo
+import io.github.beal1031.fin2go.data.playback.SubtitleTrack
+import io.github.beal1031.fin2go.data.playback.Track
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE_LANDSCAPE
 import io.github.beal1031.fin2go.ui.PreviewImage
 import io.github.beal1031.fin2go.ui.WithPreviewImages
@@ -192,6 +194,14 @@ fun PlayerScreen(
         onRetry = viewModel::retry,
         settings = settings,
         onSettings = { settings = it },
+        onAudio = {
+            viewModel.selectAudio(it)
+            settings = null
+        },
+        onSubtitles = {
+            viewModel.selectSubtitles(it)
+            settings = null
+        },
         onSpeed = {
             viewModel.setSpeed(it)
             settings = null
@@ -214,7 +224,7 @@ const val BACK_SECONDS = 10
 const val FORWARD_SECONDS = 30
 
 /** What the settings sheet shows: its list, or the choices for one setting. */
-enum class SettingsPage { MENU, SPEED, QUALITY }
+enum class SettingsPage { MENU, AUDIO, SUBTITLES, SPEED, QUALITY }
 
 /**
  * The pure UI over the [video]: loading, error, or the controls.
@@ -240,6 +250,8 @@ fun PlayerContent(
     onRetry: () -> Unit,
     settings: SettingsPage?,
     onSettings: (SettingsPage?) -> Unit,
+    onAudio: (Int) -> Unit,
+    onSubtitles: (Int?) -> Unit,
     onSpeed: (Float) -> Unit,
     onQuality: (Quality) -> Unit,
     modifier: Modifier = Modifier,
@@ -339,9 +351,10 @@ fun PlayerContent(
             )
             SettingsSheet(
                 page = settings,
-                speed = state.speed,
-                quality = state.quality,
+                state = state,
                 onPage = onSettings,
+                onAudio = onAudio,
+                onSubtitles = onSubtitles,
                 onSpeed = onSpeed,
                 onQuality = onQuality,
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -352,18 +365,22 @@ fun PlayerContent(
 
 /**
  * A sheet from the bottom. Its list shows each setting with the current value; a tap opens the choices,
- * with a back arrow to the list.
+ * with a back arrow to the list. Audio is left out when the video has no audio track.
  */
 @Composable
 private fun SettingsSheet(
     page: SettingsPage,
-    speed: Float,
-    quality: Quality,
+    state: PlayerState,
     onPage: (SettingsPage?) -> Unit,
+    onAudio: (Int) -> Unit,
+    onSubtitles: (Int?) -> Unit,
     onSpeed: (Float) -> Unit,
     onQuality: (Quality) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val speed = state.speed
+    val quality = state.quality
+    val off = stringResource(R.string.player_subtitles_off)
     Surface(
         modifier = modifier
             .widthIn(max = 480.dp)
@@ -380,8 +397,27 @@ private fun SettingsSheet(
         ) {
             when (page) {
                 SettingsPage.MENU -> {
+                    if (state.audioTracks.isNotEmpty()) {
+                        val audio = state.audioTracks.find { it.index == state.audioIndex }?.title.orEmpty()
+                        SettingRow(R.string.player_audio, audio) { onPage(SettingsPage.AUDIO) }
+                    }
+                    val subtitles = state.subtitleTracks.find { it.index == state.subtitleIndex }?.title ?: off
+                    SettingRow(R.string.player_subtitles, subtitles) { onPage(SettingsPage.SUBTITLES) }
                     SettingRow(R.string.player_speed, speedText(speed)) { onPage(SettingsPage.SPEED) }
                     SettingRow(R.string.player_quality, stringResource(quality.label)) { onPage(SettingsPage.QUALITY) }
+                }
+                SettingsPage.AUDIO -> {
+                    ChoicesHeader(R.string.player_audio) { onPage(SettingsPage.MENU) }
+                    state.audioTracks.forEach {
+                        ChoiceRow(it.title, selected = it.index == state.audioIndex) { onAudio(it.index) }
+                    }
+                }
+                SettingsPage.SUBTITLES -> {
+                    ChoicesHeader(R.string.player_subtitles) { onPage(SettingsPage.MENU) }
+                    ChoiceRow(off, selected = state.subtitleIndex == null) { onSubtitles(null) }
+                    state.subtitleTracks.forEach {
+                        ChoiceRow(it.title, selected = it.index == state.subtitleIndex) { onSubtitles(it.index) }
+                    }
                 }
                 SettingsPage.SPEED -> {
                     ChoicesHeader(R.string.player_speed) { onPage(SettingsPage.MENU) }
@@ -585,14 +621,18 @@ private fun Timeline(positionMs: Long, durationMs: Long, onSeeking: () -> Unit, 
             },
             // As long as the length is unknown, there is nothing to jump to.
             enabled = durationMs > 0L,
-            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
+            // Taller than it looks, so the finger catches the bar easily.
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp).height(80.dp),
             // A round dot instead of the tall bar, on a thin line without a gap around the dot.
+            // The dot sits in a larger see-through area, which is what the finger has to hit.
             thumb = {
-                Box(
-                    modifier = Modifier
-                        .size(16.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
-                )
+                Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                    Box(
+                        modifier = Modifier
+                            .size(16.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    )
+                }
             },
             track = { sliderState ->
                 SliderDefaults.Track(
@@ -637,8 +677,8 @@ private fun formatTime(ms: Long): String {
 }
 
 /**
- * While the player is shown: landscape, turned either way, and the status bar (time, battery) hidden.
- * A swipe from the top shows it for a moment. The navigation bar stays, see-through over the video.
+ * While the player is shown: landscape, turned either way, with the status bar (time, battery) and the
+ * navigation bar hidden. A swipe from the edge shows them for a moment.
  * When the player closes, everything goes back to normal, see [restoreWindow].
  */
 @Composable
@@ -648,18 +688,18 @@ private fun PlayerWindow() {
         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         val bars = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        bars.hide(WindowInsetsCompat.Type.statusBars())
+        bars.hide(WindowInsetsCompat.Type.systemBars())
         onDispose {
             if (!activity.isChangingConfigurations) restoreWindow(activity)
         }
     }
 }
 
-/** The phone may turn freely again and the status bar is shown again. */
+/** The phone may turn freely again and both bars are shown again. */
 private fun restoreWindow(activity: Activity) {
     activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-        .show(WindowInsetsCompat.Type.statusBars())
+        .show(WindowInsetsCompat.Type.systemBars())
 }
 
 /** Keeps the screen from turning off while [on] is true. */
@@ -719,6 +759,8 @@ private fun PlayerPreview(
                     onRetry = {},
                     settings = settings,
                     onSettings = {},
+                    onAudio = {},
+                    onSubtitles = {},
                     onSpeed = {},
                     onQuality = {},
                 ) {
@@ -761,7 +803,41 @@ private fun PlayerSkippedForwardPreview() =
 private fun PlayerSkippedBackPreview() =
     PlayerPreview(playingState, skipped = Skipped(forward = false, seconds = 10))
 
-private val changedState = playingState.copy(speed = 1.5f, quality = Quality.P720)
+private val changedState = playingState.copy(
+    speed = 1.5f,
+    quality = Quality.P720,
+    audioTracks = listOf(
+        Track(1, "English - AAC - Stereo - Default"),
+        Track(2, "Deutsch - AC3 - 5.1"),
+        Track(3, "Français - AC3 - 5.1"),
+    ),
+    audioIndex = 2,
+    subtitleTracks = listOf(
+        SubtitleTrack(4, "English - SUBRIP", externalUrl = null, mimeType = null),
+        SubtitleTrack(5, "Deutsch - SUBRIP - Forced", externalUrl = null, mimeType = null),
+        SubtitleTrack(6, "Deutsch - SRT - External", externalUrl = "preview://subtitles.srt", mimeType = null),
+    ),
+    subtitleIndex = 5,
+)
+
+@Preview(name = "4k Settings: audio", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerAudioPreview() = PlayerPreview(changedState, settings = SettingsPage.AUDIO)
+
+@Preview(name = "4l Settings: subtitles", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerSubtitlesPreview() = PlayerPreview(changedState, settings = SettingsPage.SUBTITLES)
+
+@Preview(name = "4m German", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "de")
+@Preview(name = "4n French", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "fr")
+@Preview(name = "4o Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "lb")
+@Composable
+private fun PlayerSubtitlesLanguagesPreview() = PlayerSubtitlesPreview()
+
+@Preview(name = "4p Settings without subtitles chosen", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerNoSubtitlesPreview() =
+    PlayerPreview(changedState.copy(subtitleIndex = null), settings = SettingsPage.MENU)
 
 @Preview(name = "4 Settings", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
 @Composable

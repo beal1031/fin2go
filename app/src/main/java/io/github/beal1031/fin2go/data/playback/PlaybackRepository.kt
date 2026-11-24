@@ -11,7 +11,10 @@ import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
 import org.jellyfin.sdk.api.client.extensions.sessionApi
 import org.jellyfin.sdk.api.client.extensions.videoApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
+import androidx.media3.common.MimeTypes
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.MediaStreamType
+import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 import org.jellyfin.sdk.model.api.PlayMethod
 import org.jellyfin.sdk.model.api.PlaybackInfoDto
 import org.jellyfin.sdk.model.api.PlaybackOrder
@@ -39,7 +42,22 @@ data class Stream(
     val directPlay: Boolean,
     val mediaSourceId: String?,
     val playSessionId: String?,
+    val audioTracks: List<Track> = emptyList(),
+    val subtitleTracks: List<SubtitleTrack> = emptyList(),
+    /** The audio track the server chose, from the user's settings in Jellyfin (or the one asked for). */
+    val audioIndex: Int? = null,
+    /** The subtitles the server chose the same way; null for none. */
+    val subtitleIndex: Int? = null,
 )
+
+/** An audio track. [index] is the server's number for it, [title] e.g. "German - AC3 - 5.1". */
+data class Track(val index: Int, val title: String)
+
+/**
+ * A subtitle track. [externalUrl] and [mimeType] are set when the server sends it as a file of its own;
+ * otherwise it is inside the video file.
+ */
+data class SubtitleTrack(val index: Int, val title: String, val externalUrl: String?, val mimeType: String?)
 
 /** Everything needed to start one movie or episode. */
 data class Playback(val info: PlaybackInfo, val stream: Stream, val startPositionMs: Long)
@@ -64,7 +82,7 @@ class PlaybackRepository(context: Context) {
     suspend fun prepare(id: String, fromStart: Boolean): Playback = withContext(Dispatchers.IO) {
         val (item, stream) = coroutineScope {
             val item = async { api.libraryApi.getItem(itemId = UUID.fromString(id)).content }
-            val stream = async { stream(id, maxBitrate = null) }
+            val stream = async { stream(id, maxBitrate = null, audioIndex = null, subtitleIndex = null) }
             item.await() to stream.await()
         }
         val isEpisode = item.type == BaseItemKind.EPISODE
@@ -84,15 +102,18 @@ class PlaybackRepository(context: Context) {
     /**
      * Asks the server for the way to play the item: the original file, or a converted stream.
      * With [maxBitrate] (bits per second) the server converts everything above it down to that size;
-     * without, the phone gets the best it can play.
+     * without, the phone gets the best it can play. [audioIndex] and [subtitleIndex] choose the tracks
+     * (-1: no subtitles); null leaves the choice to the server and the user's settings in Jellyfin.
      */
-    suspend fun stream(id: String, maxBitrate: Int?): Stream = withContext(Dispatchers.IO) {
+    suspend fun stream(id: String, maxBitrate: Int?, audioIndex: Int?, subtitleIndex: Int?): Stream = withContext(Dispatchers.IO) {
         val itemId = UUID.fromString(id)
         val info = api.mediaInfoApi.getPostedPlaybackInfo(
             itemId = itemId,
             data = PlaybackInfoDto(
                 deviceProfile = deviceProfile(),
                 maxStreamingBitrate = maxBitrate,
+                audioStreamIndex = audioIndex,
+                subtitleStreamIndex = subtitleIndex,
                 enableDirectPlay = true,
                 enableDirectStream = true,
                 enableTranscoding = true,
@@ -111,17 +132,47 @@ class PlaybackRepository(context: Context) {
                 playSessionId = info.playSessionId,
                 tag = source.eTag,
             )
-            // The server sends this address without its own part at the front.
-            transcodingUrl != null -> checkNotNull(api.baseUrl).trimEnd('/') + "/" + transcodingUrl.trimStart('/')
+            transcodingUrl != null -> serverUrl(transcodingUrl)
             else -> error("Server offered neither the file nor a converted stream")
         }
+        val streams = source.mediaStreams.orEmpty()
         Stream(
             itemId = itemId,
             url = url,
             directPlay = directPlay,
             mediaSourceId = source.id,
             playSessionId = info.playSessionId,
+            audioTracks = streams
+                .filter { it.type == MediaStreamType.AUDIO }
+                .map { Track(it.index, it.displayTitle ?: it.language ?: "#${it.index}") },
+            subtitleTracks = streams
+                .filter { it.type == MediaStreamType.SUBTITLE }
+                .map { subtitle ->
+                    val external = subtitle.deliveryUrl
+                        ?.takeIf { subtitle.deliveryMethod == SubtitleDeliveryMethod.EXTERNAL }
+                        ?.let(::serverUrl)
+                    SubtitleTrack(
+                        index = subtitle.index,
+                        title = subtitle.displayTitle ?: subtitle.language ?: "#${subtitle.index}",
+                        externalUrl = external,
+                        mimeType = external?.let(::subtitleMimeType),
+                    )
+                },
+            audioIndex = audioIndex ?: source.defaultAudioStreamIndex,
+            subtitleIndex = (subtitleIndex ?: source.defaultSubtitleStreamIndex)?.takeIf { it >= 0 },
         )
+    }
+
+    /** The server sends some addresses without its own part at the front. */
+    private fun serverUrl(path: String): String =
+        if (path.startsWith("http")) path else checkNotNull(api.baseUrl).trimEnd('/') + "/" + path.trimStart('/')
+
+    /** The kind of a subtitle file, from the ending of its address, e.g. ".../Stream.srt?…". */
+    private fun subtitleMimeType(url: String): String? = when (url.substringBefore('?').substringAfterLast('.')) {
+        "srt", "subrip" -> MimeTypes.APPLICATION_SUBRIP
+        "vtt" -> MimeTypes.TEXT_VTT
+        "ass", "ssa" -> MimeTypes.TEXT_SSA
+        else -> null
     }
 
     /** Playback has begun. */
