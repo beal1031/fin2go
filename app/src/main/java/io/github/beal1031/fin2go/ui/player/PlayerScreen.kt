@@ -6,10 +6,12 @@ import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.annotation.OptIn
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,24 +19,35 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -53,6 +66,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -78,8 +92,9 @@ import io.github.beal1031.fin2go.ui.WithPreviewImages
 import io.github.beal1031.fin2go.ui.components.episodeLabel
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
 import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.seconds
+import java.text.NumberFormat
 import java.util.Locale
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Connects the ViewModel to the UI. Used by the app.
@@ -120,9 +135,18 @@ fun PlayerScreen(
         if (activity?.isChangingConfigurations != true) viewModel.pause()
     }
     LaunchedEffect(state.ended) { if (state.ended) close() }
-    // While the video plays, the controls disappear 3 seconds after they were last used. Paused, they stay.
-    LaunchedEffect(controlsVisible, state.playWhenReady, interactions) {
-        if (controlsVisible && state.playWhenReady) {
+
+    // The settings sheet: closed (null), its list, or one of its choices.
+    var settings by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
+    // Registered after the one above, so it is asked first: back closes a choice, then the sheet.
+    BackHandler(enabled = settings != null) {
+        settings = if (settings == SettingsPage.MENU) null else SettingsPage.MENU
+    }
+
+    // While the video plays, the controls disappear 3 seconds after they were last used.
+    // Paused or with the settings open, they stay.
+    LaunchedEffect(controlsVisible, state.playWhenReady, interactions, settings) {
+        if (controlsVisible && state.playWhenReady && settings == null) {
             delay(3.seconds)
             controlsVisible = false
         }
@@ -166,6 +190,16 @@ fun PlayerScreen(
         },
         onBack = close,
         onRetry = viewModel::retry,
+        settings = settings,
+        onSettings = { settings = it },
+        onSpeed = {
+            viewModel.setSpeed(it)
+            settings = null
+        },
+        onQuality = {
+            viewModel.setQuality(it)
+            settings = null
+        },
         modifier = modifier,
     ) {
         // Draws the video in its own aspect ratio, with black bars where it does not fill the screen.
@@ -179,13 +213,17 @@ data class Skipped(val forward: Boolean, val seconds: Int)
 const val BACK_SECONDS = 10
 const val FORWARD_SECONDS = 30
 
+/** What the settings sheet shows: its list, or the choices for one setting. */
+enum class SettingsPage { MENU, SPEED, QUALITY }
+
 /**
  * The pure UI over the [video]: loading, error, or the controls.
- * Top: back arrow and title (for an episode with season and number).
+ * Top: back arrow, title (for an episode with season and number) and the settings gear.
  * Middle: 10 s back, play/pause, 30 s forward. Bottom: timeline with the time played and the time left.
  * [onTap] shows or hides the controls; [onDoubleTap] gets whether the left half of the screen was touched.
  * [skipped] shows the sum of the last jumps on the side they went to.
  * [onSeeking] is called while the timeline is dragged, [onSeek] with the new position when it is let go.
+ * [settings] is the open page of the settings sheet; [onSettings] opens another one, or closes the sheet with null.
  */
 @Composable
 fun PlayerContent(
@@ -200,12 +238,17 @@ fun PlayerContent(
     onSeek: (Long) -> Unit,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    settings: SettingsPage?,
+    onSettings: (SettingsPage?) -> Unit,
+    onSpeed: (Float) -> Unit,
+    onQuality: (Quality) -> Unit,
     modifier: Modifier = Modifier,
     video: @Composable () -> Unit,
 ) {
     // The touch handling below is set up once; through these it always calls the newest callbacks.
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
+    val currentOnSettings by rememberUpdatedState(onSettings)
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -233,7 +276,12 @@ fun PlayerContent(
                         .windowInsetsPadding(WindowInsets.safeDrawing)
                         .padding(16.dp),
                 ) {
-                    TopRow(info = state.info, onBack = onBack)
+                    TopRow(
+                        info = state.info,
+                        onBack = onBack,
+                        // Settings only once there is a video to change.
+                        onSettings = if (!state.loading && !state.error) ({ onSettings(SettingsPage.MENU) }) else null,
+                    )
                     Spacer(modifier = Modifier.weight(1f))
                     if (!state.loading && !state.error) {
                         Timeline(
@@ -280,7 +328,118 @@ fun PlayerContent(
                     .padding(horizontal = 96.dp),
             )
         }
+
+        if (settings != null) {
+            // Darkens everything behind the sheet; a tap there closes it.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .pointerInput(Unit) { detectTapGestures { currentOnSettings(null) } },
+            )
+            SettingsSheet(
+                page = settings,
+                speed = state.speed,
+                quality = state.quality,
+                onPage = onSettings,
+                onSpeed = onSpeed,
+                onQuality = onQuality,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
+}
+
+/**
+ * A sheet from the bottom. Its list shows each setting with the current value; a tap opens the choices,
+ * with a back arrow to the list.
+ */
+@Composable
+private fun SettingsSheet(
+    page: SettingsPage,
+    speed: Float,
+    quality: Quality,
+    onPage: (SettingsPage?) -> Unit,
+    onSpeed: (Float) -> Unit,
+    onQuality: (Quality) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .widthIn(max = 480.dp)
+            .fillMaxWidth()
+            .padding(top = 48.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+                .padding(vertical = 8.dp),
+        ) {
+            when (page) {
+                SettingsPage.MENU -> {
+                    SettingRow(R.string.player_speed, speedText(speed)) { onPage(SettingsPage.SPEED) }
+                    SettingRow(R.string.player_quality, stringResource(quality.label)) { onPage(SettingsPage.QUALITY) }
+                }
+                SettingsPage.SPEED -> {
+                    ChoicesHeader(R.string.player_speed) { onPage(SettingsPage.MENU) }
+                    SPEEDS.forEach { ChoiceRow(speedText(it), selected = it == speed) { onSpeed(it) } }
+                }
+                SettingsPage.QUALITY -> {
+                    ChoicesHeader(R.string.player_quality) { onPage(SettingsPage.MENU) }
+                    Quality.entries.forEach {
+                        ChoiceRow(stringResource(it.label), selected = it == quality) { onQuality(it) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One setting in the list: its name, and on the right the current value. */
+@Composable
+private fun SettingRow(@StringRes name: Int, value: String, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(stringResource(name)) },
+        trailingContent = { Text(value) },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.clickable(onClick = onClick),
+    )
+}
+
+/** Back arrow to the list and the name of the setting. */
+@Composable
+private fun ChoicesHeader(@StringRes name: Int, onBack: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+        IconButton(onClick = onBack) {
+            Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+        }
+        Text(text = stringResource(name), style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+/** One choice; the chosen one has a check mark. */
+@Composable
+private fun ChoiceRow(text: String, selected: Boolean, onClick: () -> Unit) {
+    ListItem(
+        headlineContent = { Text(text) },
+        trailingContent = if (selected) {
+            { Icon(painter = painterResource(R.drawable.ic_check), contentDescription = null) }
+        } else {
+            null
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        modifier = Modifier.selectable(selected = selected, onClick = onClick),
+    )
+}
+
+/** e.g. "1×", "1.5×" or in German "1,5×". */
+@Composable
+private fun speedText(speed: Float): String {
+    val locale = LocalConfiguration.current.locales[0]
+    return NumberFormat.getNumberInstance(locale).format(speed.toDouble()) + "×"
 }
 
 /** Round arrow with the seconds inside: turning back for [BACK_SECONDS], forward for [FORWARD_SECONDS]. */
@@ -328,37 +487,59 @@ private fun SkippedBadge(skipped: Skipped, modifier: Modifier = Modifier) {
     )
 }
 
-/** Back arrow, then the title. For an episode a second line, e.g. "S1:E2 · Gran Dillama". */
+/** Back arrow, then the title. On the right the settings gear, unless [onSettings] is null. */
 @Composable
-private fun TopRow(info: PlaybackInfo?, onBack: () -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+private fun TopRow(info: PlaybackInfo?, onBack: () -> Unit, onSettings: (() -> Unit)?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         IconButton(
             onClick = onBack,
             colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
         ) {
             Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
         }
-        if (info != null) {
-            Column {
-                Text(
-                    text = info.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        // Takes the free width, so the gear stays at the right edge and a long title is cut before it.
+        Box(modifier = Modifier.weight(1f)) {
+            if (info != null) TitleLines(info)
+        }
+        onSettings?.let {
+            IconButton(
+                onClick = it,
+                colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings),
+                    contentDescription = stringResource(R.string.player_settings),
                 )
-                val season = info.seasonNumber
-                val number = info.episodeNumber
-                if (season != null && number != null) {
-                    Text(
-                        text = listOfNotNull(episodeLabel(season, number), info.episodeTitle).joinToString(" · "),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
             }
+        }
+    }
+}
+
+/** The title, and for an episode a second line, e.g. "S1:E2 · Gran Dillama". */
+@Composable
+private fun TitleLines(info: PlaybackInfo) {
+    Column {
+        Text(
+            text = info.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val season = info.seasonNumber
+        val number = info.episodeNumber
+        if (season != null && number != null) {
+            Text(
+                text = listOfNotNull(episodeLabel(season, number), info.episodeTitle).joinToString(" · "),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -517,6 +698,7 @@ private fun PlayerPreview(
     controlsVisible: Boolean = true,
     picture: PreviewImage = PreviewImage.BACKDROP_TEARS_OF_STEEL,
     skipped: Skipped? = null,
+    settings: SettingsPage? = null,
 ) {
     Fin2goTheme {
         WithPreviewImages {
@@ -535,6 +717,10 @@ private fun PlayerPreview(
                     onSeek = {},
                     onBack = {},
                     onRetry = {},
+                    settings = settings,
+                    onSettings = {},
+                    onSpeed = {},
+                    onQuality = {},
                 ) {
                     // A still picture in place of the video.
                     AsyncImage(
@@ -574,6 +760,36 @@ private fun PlayerSkippedForwardPreview() =
 @Composable
 private fun PlayerSkippedBackPreview() =
     PlayerPreview(playingState, skipped = Skipped(forward = false, seconds = 10))
+
+private val changedState = playingState.copy(speed = 1.5f, quality = Quality.P720)
+
+@Preview(name = "4 Settings", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerSettingsPreview() = PlayerPreview(changedState, settings = SettingsPage.MENU)
+
+@Preview(name = "4b German", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "de")
+@Preview(name = "4c French", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "fr")
+@Preview(name = "4d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "lb")
+@Composable
+private fun PlayerSettingsLanguagesPreview() = PlayerSettingsPreview()
+
+@Preview(name = "4e Settings: speed", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerSpeedPreview() = PlayerPreview(changedState, settings = SettingsPage.SPEED)
+
+@Preview(name = "4f Speed in German (decimal comma)", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "de")
+@Composable
+private fun PlayerSpeedGermanPreview() = PlayerSpeedPreview()
+
+@Preview(name = "4g Settings: quality", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerQualityPreview() = PlayerPreview(changedState, settings = SettingsPage.QUALITY)
+
+@Preview(name = "4h German", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "de")
+@Preview(name = "4i French", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "fr")
+@Preview(name = "4j Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "lb")
+@Composable
+private fun PlayerQualityLanguagesPreview() = PlayerQualityPreview()
 
 @Preview(name = "2d Waiting for data", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
 @Composable

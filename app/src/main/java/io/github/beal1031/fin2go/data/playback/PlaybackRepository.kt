@@ -62,23 +62,43 @@ class PlaybackRepository(context: Context) {
      * when [fromStart] is set or nothing is saved.
      */
     suspend fun prepare(id: String, fromStart: Boolean): Playback = withContext(Dispatchers.IO) {
-        val itemId = UUID.fromString(id)
-        val (item, info) = coroutineScope {
-            val item = async { api.libraryApi.getItem(itemId = itemId).content }
-            val info = async {
-                api.mediaInfoApi.getPostedPlaybackInfo(
-                    itemId = itemId,
-                    data = PlaybackInfoDto(
-                        deviceProfile = deviceProfile(),
-                        enableDirectPlay = true,
-                        enableDirectStream = true,
-                        enableTranscoding = true,
-                        autoOpenLiveStream = true,
-                    ),
-                ).content
-            }
-            item.await() to info.await()
+        val (item, stream) = coroutineScope {
+            val item = async { api.libraryApi.getItem(itemId = UUID.fromString(id)).content }
+            val stream = async { stream(id, maxBitrate = null) }
+            item.await() to stream.await()
         }
+        val isEpisode = item.type == BaseItemKind.EPISODE
+        Playback(
+            info = PlaybackInfo(
+                title = (if (isEpisode) item.seriesName else null) ?: item.name.orEmpty(),
+                // As on the episode page: without a season number it counts as season 1, without a number as episode 1.
+                seasonNumber = if (isEpisode) item.parentIndexNumber ?: 1 else null,
+                episodeNumber = if (isEpisode) item.indexNumber ?: 1 else null,
+                episodeTitle = if (isEpisode) item.name?.takeIf { it.isNotBlank() } else null,
+            ),
+            stream = stream,
+            startPositionMs = if (fromStart) 0L else ticksToMs(item.userData?.playbackPositionTicks ?: 0L),
+        )
+    }
+
+    /**
+     * Asks the server for the way to play the item: the original file, or a converted stream.
+     * With [maxBitrate] (bits per second) the server converts everything above it down to that size;
+     * without, the phone gets the best it can play.
+     */
+    suspend fun stream(id: String, maxBitrate: Int?): Stream = withContext(Dispatchers.IO) {
+        val itemId = UUID.fromString(id)
+        val info = api.mediaInfoApi.getPostedPlaybackInfo(
+            itemId = itemId,
+            data = PlaybackInfoDto(
+                deviceProfile = deviceProfile(),
+                maxStreamingBitrate = maxBitrate,
+                enableDirectPlay = true,
+                enableDirectStream = true,
+                enableTranscoding = true,
+                autoOpenLiveStream = true,
+            ),
+        ).content
         info.errorCode?.let { error("Server refused playback: $it") }
         val source = info.mediaSources.firstOrNull() ?: error("Item has no playable file")
         val transcodingUrl = source.transcodingUrl
@@ -95,24 +115,12 @@ class PlaybackRepository(context: Context) {
             transcodingUrl != null -> checkNotNull(api.baseUrl).trimEnd('/') + "/" + transcodingUrl.trimStart('/')
             else -> error("Server offered neither the file nor a converted stream")
         }
-
-        val isEpisode = item.type == BaseItemKind.EPISODE
-        Playback(
-            info = PlaybackInfo(
-                title = (if (isEpisode) item.seriesName else null) ?: item.name.orEmpty(),
-                // As on the episode page: without a season number it counts as season 1, without a number as episode 1.
-                seasonNumber = if (isEpisode) item.parentIndexNumber ?: 1 else null,
-                episodeNumber = if (isEpisode) item.indexNumber ?: 1 else null,
-                episodeTitle = if (isEpisode) item.name?.takeIf { it.isNotBlank() } else null,
-            ),
-            stream = Stream(
-                itemId = itemId,
-                url = url,
-                directPlay = directPlay,
-                mediaSourceId = source.id,
-                playSessionId = info.playSessionId,
-            ),
-            startPositionMs = if (fromStart) 0L else ticksToMs(item.userData?.playbackPositionTicks ?: 0L),
+        Stream(
+            itemId = itemId,
+            url = url,
+            directPlay = directPlay,
+            mediaSourceId = source.id,
+            playSessionId = info.playSessionId,
         )
     }
 

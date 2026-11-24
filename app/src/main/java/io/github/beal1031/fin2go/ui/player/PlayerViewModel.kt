@@ -3,6 +3,8 @@ package io.github.beal1031.fin2go.ui.player
 import android.app.Application
 import android.content.Context
 import androidx.annotation.OptIn
+import androidx.annotation.StringRes
+import io.github.beal1031.fin2go.R
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.AudioAttributes
@@ -50,7 +52,24 @@ data class PlayerState(
     val durationMs: Long = 0L,
     /** The video has played to the end. */
     val ended: Boolean = false,
+    /** 1 is normal speed. */
+    val speed: Float = 1f,
+    val quality: Quality = Quality.AUTO,
 )
+
+/**
+ * How big the video may be. [maxBitrate] is the most the server may send, in bits per second;
+ * above it, the server converts the video down. AUTO has no limit: the original file when the phone can play it.
+ */
+enum class Quality(@StringRes val label: Int, val maxBitrate: Int?) {
+    AUTO(R.string.player_quality_auto, null),
+    P1080(R.string.player_quality_1080, 10_000_000),
+    P720(R.string.player_quality_720, 4_000_000),
+    P480(R.string.player_quality_480, 1_500_000),
+}
+
+/** The speeds to choose from; 1 is normal. */
+val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
 /**
  * Plays the movie or episode with [itemId], from the saved position or, with [fromStart], from the beginning.
@@ -142,6 +161,37 @@ class PlayerViewModel(
     }
 
     fun pause() = player.pause()
+
+    /** Only for this playback; the next video starts at normal speed again. */
+    fun setSpeed(speed: Float) {
+        player.setPlaybackSpeed(speed)
+        _state.update { it.copy(speed = speed) }
+    }
+
+    /**
+     * Only for this playback. Asks the server for a new stream in [quality] and continues at the same position;
+     * the old stream is reported as stopped, so the server stops converting it.
+     */
+    fun setQuality(quality: Quality) {
+        val old = stream
+        if (old == null || quality == _state.value.quality) return
+        val position = player.currentPosition
+        _state.update { it.copy(quality = quality) }
+        viewModelScope.launch {
+            try {
+                playback.reportStopped(old, position)
+                val new = playback.stream(itemId, quality.maxBitrate)
+                stream = new
+                player.setMediaItem(new.toMediaItem(), position)
+                player.prepare()
+                playback.reportStart(new, position, paused = !player.playWhenReady)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(error = true) }
+            }
+        }
+    }
 
     /** Jumps [byMs] forward, or back when negative, but not before the start or past the end. */
     fun skip(byMs: Long) {
