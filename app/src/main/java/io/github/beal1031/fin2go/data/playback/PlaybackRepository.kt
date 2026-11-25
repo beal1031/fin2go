@@ -2,7 +2,10 @@ package io.github.beal1031.fin2go.data.playback
 
 import android.content.Context
 import io.github.beal1031.fin2go.data.JellyfinClient
+import io.github.beal1031.fin2go.data.ServerStatus
 import io.github.beal1031.fin2go.data.download.DownloadRepository
+import io.github.beal1031.fin2go.data.media.OfflineLibrary
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -16,6 +19,7 @@ import org.jellyfin.sdk.api.client.extensions.videoApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
+import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaSegmentType
 import org.jellyfin.sdk.model.api.MediaStreamType
@@ -80,7 +84,9 @@ data class Playback(val info: PlaybackInfo, val stream: Stream, val startPositio
 
 /** Asks the server how to play a movie or episode, and tells it how far the user is. */
 class PlaybackRepository(context: Context) {
+    private val context = context.applicationContext
     private val api = JellyfinClient.api(context)
+    private val offline = OfflineLibrary(context)
     private val downloads = DownloadRepository(context)
     private val progressSync = ProgressSync(context)
 
@@ -95,12 +101,16 @@ class PlaybackRepository(context: Context) {
 
     /**
      * Loads the item and the way to play it. It starts at the saved position, or at the beginning
-     * when [fromStart] is set or nothing is saved.
+     * when [fromStart] is set or nothing is saved. Without the server, a downloaded item is prepared
+     * from what is saved on the phone.
      */
-    suspend fun prepare(id: String, fromStart: Boolean, maxBitrate: Int?): Playback = withContext(Dispatchers.IO) {
+    suspend fun prepare(id: String, fromStart: Boolean, maxBitrate: Int?): Playback =
+        serverOrPhone({ prepareFromServer(id, fromStart, maxBitrate) }, { prepareFromPhone(id, fromStart) })
+
+    private suspend fun prepareFromServer(id: String, fromStart: Boolean, maxBitrate: Int?): Playback = coroutineScope {
         val (item, stream) = coroutineScope {
             val item = async { api.libraryApi.getItem(itemId = UUID.fromString(id)).content }
-            val stream = async { stream(id, maxBitrate, audioIndex = null, subtitleIndex = null) }
+            val stream = async { streamFromServer(id, maxBitrate, audioIndex = null, subtitleIndex = null) }
             item.await() to stream.await()
         }
         val isEpisode = item.type == BaseItemKind.EPISODE
@@ -112,21 +122,75 @@ class PlaybackRepository(context: Context) {
         } else {
             null to null
         }
-        Playback(
+        // Only needed when there is a next episode to show.
+        playback(item, stream, fromStart, previous, next, creditsStartMs = if (next != null) creditsStart(item.id) else null)
+    }
+
+    /**
+     * Prepares a downloaded item without the server. Previous and next only lead to downloaded episodes;
+     * where the credits begin is not known. Null when the item is not on the phone.
+     */
+    private suspend fun prepareFromPhone(id: String, fromStart: Boolean): Playback? {
+        val item = offline.item(id) ?: return null
+        val stream = streamFromPhone(id) ?: return null
+        val season = if (item.type == BaseItemKind.EPISODE) item.parentIndexNumber ?: 1 else null
+        val seriesId = item.seriesId
+        val (previous, next) = if (seriesId != null && season != null) {
+            val specials = season == 0
+            val episodes = offline.items()
+                .filter { it.seriesId == seriesId && ((it.parentIndexNumber ?: 1) == 0) == specials }
+                .sortedWith(compareBy({ it.parentIndexNumber ?: 1 }, { it.indexNumber ?: 1 }))
+            val position = episodes.indexOfFirst { it.id == item.id }
+            episodes.getOrNull(position - 1)?.id?.toString() to episodes.getOrNull(position + 1)?.id?.toString()
+        } else {
+            null to null
+        }
+        return playback(item, stream, fromStart, previous, next, creditsStartMs = null)
+    }
+
+    private fun playback(
+        item: BaseItemDto,
+        stream: Stream,
+        fromStart: Boolean,
+        previous: String?,
+        next: String?,
+        creditsStartMs: Long?,
+    ): Playback {
+        val isEpisode = item.type == BaseItemKind.EPISODE
+        return Playback(
             info = PlaybackInfo(
                 title = (if (isEpisode) item.seriesName else null) ?: item.name.orEmpty(),
-                seasonNumber = season,
+                // As on the episode page: without a season number it counts as season 1, without a number as episode 1.
+                seasonNumber = if (isEpisode) item.parentIndexNumber ?: 1 else null,
                 episodeNumber = if (isEpisode) item.indexNumber ?: 1 else null,
                 episodeTitle = if (isEpisode) item.name?.takeIf { it.isNotBlank() } else null,
                 previousEpisodeId = previous,
                 nextEpisodeId = next,
-                // Only needed when there is a next episode to show.
-                creditsStartMs = if (next != null) creditsStart(item.id) else null,
+                creditsStartMs = creditsStartMs,
             ),
             stream = stream,
             startPositionMs = if (fromStart) 0L else ticksToMs(item.userData?.playbackPositionTicks ?: 0L),
         )
     }
+
+    /**
+     * Runs [fromServer] while the server is reachable, otherwise [fromPhone]. If the server fails,
+     * [fromPhone] is tried too; only when the item is not on the phone either, the error stays.
+     */
+    private suspend fun <T> serverOrPhone(fromServer: suspend () -> T, fromPhone: suspend () -> T?): T =
+        withContext(Dispatchers.IO) {
+            if (ServerStatus.reachable(context).value) {
+                try {
+                    return@withContext fromServer()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    ServerStatus.recheck()
+                    return@withContext fromPhone() ?: throw e
+                }
+            }
+            fromPhone() ?: error("Not on the phone")
+        }
 
     /** Where the credits of the item begin; null when the server does not know it or cannot tell. */
     private suspend fun creditsStart(itemId: UUID): Long? = runCatching {
@@ -158,7 +222,13 @@ class PlaybackRepository(context: Context) {
      * A downloaded item is always played from its file on the phone, in its original quality; the server still
      * tells which tracks it has, because it is the same file.
      */
-    suspend fun stream(id: String, maxBitrate: Int?, audioIndex: Int?, subtitleIndex: Int?): Stream = withContext(Dispatchers.IO) {
+    suspend fun stream(id: String, maxBitrate: Int?, audioIndex: Int?, subtitleIndex: Int?): Stream =
+        serverOrPhone(
+            fromServer = { streamFromServer(id, maxBitrate, audioIndex, subtitleIndex) },
+            fromPhone = { streamFromPhone(id, audioIndex, subtitleIndex) },
+        )
+
+    private suspend fun streamFromServer(id: String, maxBitrate: Int?, audioIndex: Int?, subtitleIndex: Int?): Stream {
         val itemId = UUID.fromString(id)
         val info = api.mediaInfoApi.getPostedPlaybackInfo(
             itemId = itemId,
@@ -191,7 +261,7 @@ class PlaybackRepository(context: Context) {
             else -> error("Server offered neither the file nor a converted stream")
         }
         val streams = source.mediaStreams.orEmpty()
-        Stream(
+        return Stream(
             itemId = itemId,
             url = url,
             directPlay = directPlay,
@@ -216,6 +286,36 @@ class PlaybackRepository(context: Context) {
                 },
             audioIndex = audioIndex ?: source.defaultAudioStreamIndex,
             subtitleIndex = (subtitleIndex ?: source.defaultSubtitleStreamIndex)?.takeIf { it >= 0 },
+        )
+    }
+
+    /**
+     * The downloaded file, with the tracks inside it from the saved info, for playing without the server.
+     * Subtitles in files of their own are not downloaded, so only the ones inside the video are there.
+     * Null when the item is not on the phone.
+     */
+    private suspend fun streamFromPhone(id: String, audioIndex: Int? = null, subtitleIndex: Int? = null): Stream? {
+        val item = offline.item(id) ?: return null
+        val file = downloads.localFile(id) ?: return null
+        val source = item.mediaSources?.firstOrNull()
+        val streams = (source?.mediaStreams ?: item.mediaStreams).orEmpty().filter { !it.isExternal }
+        val audio = streams.filter { it.type == MediaStreamType.AUDIO }
+        val subtitles = streams.filter { it.type == MediaStreamType.SUBTITLE }
+        return Stream(
+            itemId = item.id,
+            url = file.toUri().toString(),
+            directPlay = true,
+            mediaSourceId = source?.id,
+            playSessionId = null,
+            audioTracks = audio.map { Track(it.index, it.displayTitle ?: it.language ?: "#${it.index}", it.language) },
+            subtitleTracks = subtitles.map {
+                SubtitleTrack(it.index, it.displayTitle ?: it.language ?: "#${it.index}", null, null, it.language)
+            },
+            // As the server would choose: its default for this file, else the track marked as default.
+            audioIndex = audioIndex ?: source?.defaultAudioStreamIndex ?: audio.firstOrNull { it.isDefault }?.index
+                ?: audio.firstOrNull()?.index,
+            subtitleIndex = (subtitleIndex ?: source?.defaultSubtitleStreamIndex ?: subtitles.firstOrNull { it.isForced }?.index)
+                ?.takeIf { index -> index >= 0 && subtitles.any { it.index == index } },
         )
     }
 
@@ -296,7 +396,9 @@ class PlaybackRepository(context: Context) {
     private suspend fun reportPosition(stream: Stream, positionMs: Long, block: suspend () -> Unit) {
         withContext(Dispatchers.IO) {
             val id = stream.itemId.toString()
-            if (runCatching { block() }.isSuccess) {
+            // Known offline: no need to wait for the server, e.g. when closing the player.
+            val sent = ServerStatus.reachable(context).value && runCatching { block() }.isSuccess
+            if (sent) {
                 lastSentMs[id] = positionMs
                 progressSync.forget(id)
             } else {
