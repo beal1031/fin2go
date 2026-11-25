@@ -24,6 +24,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import io.github.beal1031.fin2go.data.media.MediaRepository
 import io.github.beal1031.fin2go.data.playback.PlaybackInfo
 import io.github.beal1031.fin2go.data.playback.PlaybackRepository
 import io.github.beal1031.fin2go.data.playback.Stream
@@ -89,10 +90,17 @@ val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
  */
 class PlayerViewModel(
     application: Application,
-    private val itemId: String,
-    private val fromStart: Boolean,
+    itemId: String,
+    fromStart: Boolean,
 ) : AndroidViewModel(application) {
     private val playback = PlaybackRepository(application)
+    private val media = MediaRepository(application)
+
+    /** The movie or episode playing now; changes when the user goes to the previous or next episode. */
+    private var itemId = itemId
+
+    /** Whether loading [itemId] starts at the beginning instead of the saved position. */
+    private var fromStart = fromStart
 
     /** Drawn by the UI; all calls to it happen on the main thread. */
     val player: ExoPlayer = createPlayer(application, playback.authorizationHeader())
@@ -152,11 +160,70 @@ class PlayerViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = true, error = false) }
             try {
-                val prepared = playback.prepare(itemId, fromStart)
-                _state.update { it.copy(loading = false, info = prepared.info) }
-                useStream(prepared.stream, prepared.startPositionMs)
-                player.play()
-                playback.reportStart(prepared.stream, prepared.startPositionMs, paused = false)
+                start()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(loading = false, error = true) }
+            }
+        }
+    }
+
+    /**
+     * Starts [itemId] in the chosen quality. With [before] (the state of the previous episode), its audio
+     * and subtitle language is taken over, as far as the new episode has the same language.
+     */
+    private suspend fun start(before: PlayerState? = null) {
+        val quality = _state.value.quality
+        val prepared = playback.prepare(itemId, fromStart, quality.maxBitrate)
+        var new = prepared.stream
+        if (before != null) {
+            val audio = before.audioTracks.find { it.index == before.audioIndex }?.language
+                ?.let { language -> new.audioTracks.find { it.language == language }?.index }
+                ?: new.audioIndex
+            val subtitles = if (before.subtitleIndex == null) {
+                null
+            } else {
+                before.subtitleTracks.find { it.index == before.subtitleIndex }?.language
+                    ?.let { language -> new.subtitleTracks.find { it.language == language }?.index }
+                    ?: new.subtitleIndex
+            }
+            new = when {
+                audio == new.audioIndex && subtitles == new.subtitleIndex -> new
+                // The original file has all tracks; the player picks them itself.
+                new.directPlay -> new.copy(audioIndex = audio, subtitleIndex = subtitles)
+                // A converted stream has to be made again with these tracks.
+                else -> playback.stream(itemId, quality.maxBitrate, audio, subtitles ?: -1)
+            }
+        }
+        _state.update { it.copy(loading = false, info = prepared.info) }
+        useStream(new, prepared.startPositionMs)
+        player.play()
+        playback.reportStart(new, prepared.startPositionMs, paused = false)
+    }
+
+    /**
+     * Goes to the next episode ([forward]) or the previous one. The current episode is marked as watched
+     * going forward and as not watched going back, wherever the user is in it. The episode landed on is
+     * marked as not watched and starts at the beginning. Speed, quality and track languages are kept.
+     */
+    fun goToEpisode(forward: Boolean) {
+        val before = _state.value
+        val target = (if (forward) before.info?.nextEpisodeId else before.info?.previousEpisodeId) ?: return
+        val old = stream
+        val oldId = itemId
+        val position = player.currentPosition
+        player.pause()
+        stream = null
+        itemId = target
+        fromStart = true
+        _state.update { PlayerState(speed = it.speed, quality = it.quality) }
+        viewModelScope.launch {
+            try {
+                if (old != null) playback.reportStopped(old, position)
+                media.setWatched(oldId, forward)
+                media.setWatched(target, false)
+                start(before)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

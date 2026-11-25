@@ -83,4 +83,6 @@
     <string name="player_audio">Audio</string>
     <string name="player_subtitles">Sous-titres</string>
     <string name="player_subtitles_off">Désactivés</string>
+    <string name="player_previous_episode">Épisode précédent</string>
+    <string name="player_next_episode">Épisode suivant</string>
 </resources>

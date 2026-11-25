@@ -181,6 +181,10 @@ fun PlayerScreen(
             interactions++
             skip(forward)
         },
+        onEpisode = { forward ->
+            interactions++
+            viewModel.goToEpisode(forward)
+        },
         onPlayPause = {
             interactions++
             viewModel.playPause()
@@ -243,6 +247,7 @@ fun PlayerContent(
     onTap: () -> Unit,
     onDoubleTap: (leftHalf: Boolean) -> Unit,
     onSkip: (forward: Boolean) -> Unit,
+    onEpisode: (forward: Boolean) -> Unit,
     onPlayPause: () -> Unit,
     onSeeking: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -308,8 +313,16 @@ fun PlayerContent(
                     Row(
                         modifier = Modifier.align(Alignment.Center),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(48.dp),
+                        horizontalArrangement = Arrangement.spacedBy(40.dp),
                     ) {
+                        // Only episodes have a previous and next one. At the first or last episode the button
+                        // is left out, but its place stays free, so play/pause stays in the middle.
+                        val episode = state.info?.takeIf { it.seasonNumber != null }
+                        if (episode != null) {
+                            EpisodeButton(forward = false, visible = episode.previousEpisodeId != null) {
+                                onEpisode(false)
+                            }
+                        }
                         SkipButton(forward = false, onClick = { onSkip(false) })
                         if (state.buffering) {
                             // The loading circle below takes this place.
@@ -318,6 +331,11 @@ fun PlayerContent(
                             PlayPauseButton(playing = state.playWhenReady, onClick = onPlayPause)
                         }
                         SkipButton(forward = true, onClick = { onSkip(true) })
+                        if (episode != null) {
+                            EpisodeButton(forward = true, visible = episode.nextEpisodeId != null) {
+                                onEpisode(true)
+                            }
+                        }
                     }
                 }
             }
@@ -476,6 +494,24 @@ private fun ChoiceRow(text: String, selected: Boolean, onClick: () -> Unit) {
 private fun speedText(speed: Float): String {
     val locale = LocalConfiguration.current.locales[0]
     return NumberFormat.getNumberInstance(locale).format(speed.toDouble()) + "×"
+}
+
+/** To the previous or the next episode. When not [visible], only its empty place is kept. */
+@Composable
+private fun EpisodeButton(forward: Boolean, visible: Boolean, onClick: () -> Unit) {
+    if (!visible) {
+        Spacer(modifier = Modifier.size(48.dp))
+        return
+    }
+    IconButton(onClick = onClick, colors = IconButtonDefaults.iconButtonColors(contentColor = Color.White)) {
+        Icon(
+            painter = painterResource(if (forward) R.drawable.ic_skip_next else R.drawable.ic_skip_previous),
+            contentDescription = stringResource(
+                if (forward) R.string.player_next_episode else R.string.player_previous_episode,
+            ),
+            modifier = Modifier.size(32.dp),
+        )
+    }
 }
 
 /** Round arrow with the seconds inside: turning back for [BACK_SECONDS], forward for [FORWARD_SECONDS]. */
@@ -721,6 +757,8 @@ private val episodeInfo = PlaybackInfo(
     seasonNumber = 1,
     episodeNumber = 2,
     episodeTitle = "Gran Dillama",
+    previousEpisodeId = "1",
+    nextEpisodeId = "3",
 )
 
 private val playingState = PlayerState(
@@ -752,6 +790,7 @@ private fun PlayerPreview(
                     onTap = {},
                     onDoubleTap = {},
                     onSkip = {},
+                    onEpisode = {},
                     onPlayPause = {},
                     onSeeking = {},
                     onSeek = {},
@@ -885,6 +924,20 @@ private fun PlayerNoDurationPreview() =
 private fun PlayerEpisodePreview() = PlayerPreview(
     playingState.copy(info = episodeInfo, positionMs = 62 * 60_000L + 3_000L, durationMs = 95 * 60_000L),
     picture = PreviewImage.EPISODE_CAMINANDES_2,
+)
+
+@Preview(name = "2e2 First episode: no previous", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerFirstEpisodePreview() = PlayerPreview(
+    playingState.copy(info = episodeInfo.copy(episodeNumber = 1, episodeTitle = "Llama Drama", previousEpisodeId = null)),
+    picture = PreviewImage.EPISODE_CAMINANDES_1,
+)
+
+@Preview(name = "2e3 Last episode: no next", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerLastEpisodePreview() = PlayerPreview(
+    playingState.copy(info = episodeInfo.copy(episodeNumber = 3, episodeTitle = "Llamigos", nextEpisodeId = null)),
+    picture = PreviewImage.EPISODE_CAMINANDES_3,
 )
 
 @Preview(name = "2f Special with a long title", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)

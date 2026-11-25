@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
 import org.jellyfin.sdk.api.client.extensions.sessionApi
+import org.jellyfin.sdk.api.client.extensions.showApi
 import org.jellyfin.sdk.api.client.extensions.videoApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import androidx.media3.common.MimeTypes
@@ -32,6 +33,9 @@ data class PlaybackInfo(
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val episodeTitle: String? = null,
+    /** The episodes before and after this one; null at the first or last episode, and for movies. */
+    val previousEpisodeId: String? = null,
+    val nextEpisodeId: String? = null,
 )
 
 /** Where the video comes from and how the server delivers it. Needed again for every report. */
@@ -51,13 +55,19 @@ data class Stream(
 )
 
 /** An audio track. [index] is the server's number for it, [title] e.g. "German - AC3 - 5.1". */
-data class Track(val index: Int, val title: String)
+data class Track(val index: Int, val title: String, val language: String? = null)
 
 /**
  * A subtitle track. [externalUrl] and [mimeType] are set when the server sends it as a file of its own;
  * otherwise it is inside the video file.
  */
-data class SubtitleTrack(val index: Int, val title: String, val externalUrl: String?, val mimeType: String?)
+data class SubtitleTrack(
+    val index: Int,
+    val title: String,
+    val externalUrl: String?,
+    val mimeType: String?,
+    val language: String? = null,
+)
 
 /** Everything needed to start one movie or episode. */
 data class Playback(val info: PlaybackInfo, val stream: Stream, val startPositionMs: Long)
@@ -79,24 +89,48 @@ class PlaybackRepository(context: Context) {
      * Loads the item and the way to play it. It starts at the saved position, or at the beginning
      * when [fromStart] is set or nothing is saved.
      */
-    suspend fun prepare(id: String, fromStart: Boolean): Playback = withContext(Dispatchers.IO) {
+    suspend fun prepare(id: String, fromStart: Boolean, maxBitrate: Int?): Playback = withContext(Dispatchers.IO) {
         val (item, stream) = coroutineScope {
             val item = async { api.libraryApi.getItem(itemId = UUID.fromString(id)).content }
-            val stream = async { stream(id, maxBitrate = null, audioIndex = null, subtitleIndex = null) }
+            val stream = async { stream(id, maxBitrate, audioIndex = null, subtitleIndex = null) }
             item.await() to stream.await()
         }
         val isEpisode = item.type == BaseItemKind.EPISODE
+        // As on the episode page: without a season number it counts as season 1, without a number as episode 1.
+        val season = if (isEpisode) item.parentIndexNumber ?: 1 else null
+        val seriesId = item.seriesId
+        val (previous, next) = if (isEpisode && seriesId != null && season != null) {
+            neighbours(seriesId, item.id, specials = season == 0)
+        } else {
+            null to null
+        }
         Playback(
             info = PlaybackInfo(
                 title = (if (isEpisode) item.seriesName else null) ?: item.name.orEmpty(),
-                // As on the episode page: without a season number it counts as season 1, without a number as episode 1.
-                seasonNumber = if (isEpisode) item.parentIndexNumber ?: 1 else null,
+                seasonNumber = season,
                 episodeNumber = if (isEpisode) item.indexNumber ?: 1 else null,
                 episodeTitle = if (isEpisode) item.name?.takeIf { it.isNotBlank() } else null,
+                previousEpisodeId = previous,
+                nextEpisodeId = next,
             ),
             stream = stream,
             startPositionMs = if (fromStart) 0L else ticksToMs(item.userData?.playbackPositionTicks ?: 0L),
         )
+    }
+
+    /**
+     * The episodes before and after [episodeId], over all seasons. The specials (season 0) are left out;
+     * for a special, only the specials count. Null at the first or last episode.
+     */
+    private suspend fun neighbours(seriesId: UUID, episodeId: UUID, specials: Boolean): Pair<String?, String?> {
+        val episodes = api.showApi.getEpisodes(seriesId = seriesId, isMissing = false).content.items
+            // Without a season number, an episode counts as season 1, as on the series page.
+            .filter { ((it.parentIndexNumber ?: 1) == 0) == specials }
+            // sortedBy keeps the server's order inside each season.
+            .sortedBy { it.parentIndexNumber ?: 1 }
+        val position = episodes.indexOfFirst { it.id == episodeId }
+        if (position < 0) return null to null
+        return episodes.getOrNull(position - 1)?.id?.toString() to episodes.getOrNull(position + 1)?.id?.toString()
     }
 
     /**
@@ -144,7 +178,7 @@ class PlaybackRepository(context: Context) {
             playSessionId = info.playSessionId,
             audioTracks = streams
                 .filter { it.type == MediaStreamType.AUDIO }
-                .map { Track(it.index, it.displayTitle ?: it.language ?: "#${it.index}") },
+                .map { Track(it.index, it.displayTitle ?: it.language ?: "#${it.index}", it.language) },
             subtitleTracks = streams
                 .filter { it.type == MediaStreamType.SUBTITLE }
                 .map { subtitle ->
@@ -156,6 +190,7 @@ class PlaybackRepository(context: Context) {
                         title = subtitle.displayTitle ?: subtitle.language ?: "#${subtitle.index}",
                         externalUrl = external,
                         mimeType = external?.let(::subtitleMimeType),
+                        language = subtitle.language,
                     )
                 },
             audioIndex = audioIndex ?: source.defaultAudioStreamIndex,
