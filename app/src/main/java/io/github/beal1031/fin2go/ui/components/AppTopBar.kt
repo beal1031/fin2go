@@ -1,5 +1,6 @@
 package io.github.beal1031.fin2go.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -53,7 +54,7 @@ val AppTopBarHeight = 56.dp
 /**
  * The bar at the top of the app: the title on the left, the round profile picture with its menu on the right.
  * It has no background, so a picture behind it stays visible.
- * Without [onBack], "Fin2Go" is shown. With [onBack], a back arrow comes first, followed by [title] if given.
+ * Without [onBack], the Fin2Go wordmark is shown. With [onBack], a back arrow comes first, followed by [title] if given.
  * With [onPicture], the back arrow gets a dark round background, so it stays visible on a bright picture behind the bar.
  * With [offline], a crossed-out cloud in the middle of the bar shows that the server cannot be reached.
  */
@@ -92,18 +93,25 @@ fun AppTopBar(
                     Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                 }
             }
-            val text = title ?: if (onBack == null) stringResource(R.string.app_name) else null
-            if (text != null) {
-                Text(
-                    text = text,
+            when {
+                title != null -> Text(
+                    text = title,
                     style = MaterialTheme.typography.titleLarge,
                     // A long title is cut off with "…", so the bar keeps its height.
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
+                onBack == null -> {
+                    // The app name as the Fin2Go wordmark: a drawing, so it looks the same in every language.
+                    Image(
+                        painter = painterResource(R.drawable.fin2go_wordmark),
+                        contentDescription = stringResource(R.string.app_name),
+                        modifier = Modifier.height(22.dp),
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                }
+                else -> Spacer(modifier = Modifier.weight(1f))
             }
 
             // Only the UI needs to know whether the menu is open, so it is kept here and not in a ViewModel.
