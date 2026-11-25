@@ -82,6 +82,7 @@ fun AppNavigation(
     modifier: Modifier = Modifier,
     systemBarsPadding: PaddingValues = PaddingValues(),
     statusBarHeight: Dp = 0.dp,
+    offline: Boolean = false,
 ) {
     val navController = rememberNavController()
     // Changes whenever the shown screen changes, so the bar can show the matching title.
@@ -197,6 +198,7 @@ fun AppNavigation(
                 title = title,
                 onBack = if (!onHome && entry != null) ({ back(entry) }) else null,
                 onPicture = onDetailPage,
+                offline = offline,
                 modifier = Modifier.padding(top = statusBarHeight),
             )
         }

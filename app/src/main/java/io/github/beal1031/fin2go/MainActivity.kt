@@ -14,6 +14,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.ui.AppNavigation
 import io.github.beal1031.fin2go.ui.login.LoginScreen
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
             Fin2goTheme {
                 val appViewModel: AppViewModel = viewModel()
                 val state by appViewModel.state.collectAsState()
+                // Only checked while the app is visible.
+                val serverReachable by appViewModel.serverReachable.collectAsStateWithLifecycle()
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     // consumeWindowInsets: the bars handled here are not added again by imePadding.
@@ -53,6 +56,7 @@ class MainActivity : ComponentActivity() {
                             onSignOut = appViewModel::signOut,
                             systemBarsPadding = innerPadding,
                             statusBarHeight = innerPadding.calculateTopPadding(),
+                            offline = !serverReachable,
                         )
                     }
                 }

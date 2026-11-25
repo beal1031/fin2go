@@ -4,8 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.beal1031.fin2go.data.JellyfinClient
+import io.github.beal1031.fin2go.data.ServerStatus
 import io.github.beal1031.fin2go.data.account.Account
 import io.github.beal1031.fin2go.data.account.AccountStore
+import io.github.beal1031.fin2go.data.download.DownloadRepository
 import io.github.beal1031.fin2go.data.media.MediaRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,9 +38,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val accountStore = AccountStore(application)
     private val media = MediaRepository(application)
 
+    /** False while the server cannot be reached: then the app is offline. */
+    val serverReachable: StateFlow<Boolean> = ServerStatus.reachable(application)
+
+    init {
+        // At each start: fetch series info that older downloads are still missing. Offline it fails quietly
+        // and is tried again at the next start.
+        viewModelScope.launch { DownloadRepository(application).fillMissingSeries() }
+    }
+
     val state: StateFlow<AppState> = accountStore.account
         .onEach { account ->
             api.update(baseUrl = account?.serverUrl, accessToken = account?.accessToken)
+            ServerStatus.recheck()
         }
         .map { account ->
             if (account == null) AppState.SignedOut

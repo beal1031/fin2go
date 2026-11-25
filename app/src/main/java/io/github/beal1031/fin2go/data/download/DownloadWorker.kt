@@ -19,11 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.api.client.extensions.libraryApi
-import org.jellyfin.sdk.model.api.BaseItemDto
-import org.jellyfin.sdk.model.api.ImageType
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -53,9 +49,10 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
             val title = item.name.orEmpty()
             setForeground(foregroundInfo(title, progress = null))
 
-            val folder = DownloadRepository.folder(applicationContext, itemId).apply { mkdirs() }
-            File(folder, "item.json").writeText(json.encodeToString(BaseItemDto.serializer(), item))
-            savePictures(item, folder, authorization)
+            val folder = DownloadRepository.folder(applicationContext, itemId)
+            OfflineInfo.save(applicationContext, item, folder)
+            // The series page needs the series too. If that fails, the episode still loads; it is tried again later.
+            item.seriesId?.let { seriesId -> runCatching { OfflineInfo.saveSeriesIfMissing(applicationContext, seriesId.toString()) } }
 
             // e.g. "mkv"; some servers name several, e.g. "mov,mp4,m4a".
             val container = item.mediaSources?.firstOrNull()?.container?.substringBefore(',') ?: "mkv"
@@ -99,36 +96,17 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         }
     }
 
-    /** The poster (or the episode's picture) and the wide backdrop. Missing pictures are skipped. */
-    private suspend fun savePictures(item: BaseItemDto, folder: File, authorization: String) {
-        val api = JellyfinClient.api(applicationContext)
-        val primary = item.imageTags?.get(ImageType.PRIMARY)?.let {
-            api.imageApi.getItemImageUrl(itemId = item.id, imageType = ImageType.PRIMARY, tag = it, maxWidth = 600)
-        }
-        val backdropTag = item.backdropImageTags?.firstOrNull() ?: item.parentBackdropImageTags?.firstOrNull()
-        val backdropItem = if (item.backdropImageTags.isNullOrEmpty()) item.parentBackdropItemId else item.id
-        val backdrop = if (backdropTag != null && backdropItem != null) {
-            api.imageApi.getItemImageUrl(itemId = backdropItem, imageType = ImageType.BACKDROP, tag = backdropTag, maxWidth = 1280)
-        } else {
-            null
-        }
-        listOf("primary.jpg" to primary, "backdrop.jpg" to backdrop).forEach { (name, url) ->
-            if (url != null) runCatching { downloadFile(url, File(folder, name), authorization, resume = false) {} }
-        }
-    }
-
     /**
-     * Loads [url] into [file]. With [resume], a file that is already partly there is continued
-     * instead of loaded again. [onProgress] gets the share loaded so far, from 0 to 1, or null when the size is unknown.
+     * Loads [url] into [file]. A file that is already partly there is continued instead of loaded again.
+     * [onProgress] gets the share loaded so far, from 0 to 1, or null when the size is unknown.
      */
     private suspend fun downloadFile(
         url: String,
         file: File,
         authorization: String,
-        resume: Boolean = true,
         onProgress: suspend (Float?) -> Unit,
     ) {
-        val already = if (resume && file.exists()) file.length() else 0L
+        val already = if (file.exists()) file.length() else 0L
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             setRequestProperty("Authorization", authorization)
             if (already > 0) setRequestProperty("Range", "bytes=$already-")
@@ -197,6 +175,5 @@ class DownloadWorker(context: Context, params: WorkerParameters) : CoroutineWork
         const val PROGRESS = "progress"
         private const val MAX_ATTEMPTS = 10
         private const val CHANNEL_ID = "downloads"
-        private val json = Json { encodeDefaults = false }
     }
 }

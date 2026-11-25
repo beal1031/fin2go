@@ -55,6 +55,7 @@ val AppTopBarHeight = 56.dp
  * It has no background, so a picture behind it stays visible.
  * Without [onBack], "Fin2Go" is shown. With [onBack], a back arrow comes first, followed by [title] if given.
  * With [onPicture], the back arrow gets a dark round background, so it stays visible on a bright picture behind the bar.
+ * With [offline], a crossed-out cloud left of the profile picture shows that the server cannot be reached.
  */
 @Composable
 fun AppTopBar(
@@ -65,6 +66,7 @@ fun AppTopBar(
     title: String? = null,
     onBack: (() -> Unit)? = null,
     onPicture: Boolean = false,
+    offline: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -104,6 +106,14 @@ fun AppTopBar(
             Spacer(modifier = Modifier.weight(1f))
         }
 
+        if (offline) {
+            Icon(
+                painter = painterResource(R.drawable.ic_cloud_off),
+                contentDescription = stringResource(R.string.offline),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(end = 12.dp),
+            )
+        }
         // Only the UI needs to know whether the menu is open, so it is kept here and not in a ViewModel.
         var menuOpen by remember { mutableStateOf(false) }
         Box {
@@ -174,6 +184,7 @@ private fun AppTopBarPreview(
     menuOpen: Boolean = false,
     withBack: Boolean = false,
     withTitle: Boolean = true,
+    offline: Boolean = false,
 ) {
     Fin2goTheme {
         WithPreviewImages {
@@ -198,6 +209,7 @@ private fun AppTopBarPreview(
                             title = if (withBack && withTitle) stringResource(R.string.series) else null,
                             onBack = if (withBack) ({}) else null,
                             onPicture = onPicture,
+                            offline = offline,
                         )
                     }
                     // The real menu is a popup, which the static preview does not draw.
@@ -253,3 +265,7 @@ private fun AppTopBarBackLanguagesPreview() = AppTopBarPreview(withPicture = tru
 @Preview(name = "5 Only back arrow (movie page)", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun AppTopBarOnlyBackPreview() = AppTopBarPreview(withPicture = true, withBack = true, withTitle = false)
+
+@Preview(name = "9 Offline: crossed-out cloud", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun AppTopBarOfflinePreview() = AppTopBarPreview(withPicture = true, offline = true)

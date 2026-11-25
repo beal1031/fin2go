@@ -118,4 +118,7 @@
         <item quantity="one">%1$d Folge wird von diesem Handy gelöscht.</item>
         <item quantity="other">%1$d Folgen werden von diesem Handy gelöscht.</item>
     </plurals>
+
+    <!-- Crossed-out cloud in the top bar while the server cannot be reached; read out by screen readers -->
+    <string name="offline">Offline, nur Downloads</string>
 </resources>

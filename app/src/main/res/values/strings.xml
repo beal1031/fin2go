@@ -137,4 +137,7 @@
         <item quantity="one">%1$d episode will be removed from this phone.</item>
         <item quantity="other">%1$d episodes will be removed from this phone.</item>
     </plurals>
+
+    <!-- Crossed-out cloud in the top bar while the server cannot be reached; read out by screen readers -->
+    <string name="offline">Offline, only downloads</string>
 </resources>

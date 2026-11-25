@@ -122,4 +122,7 @@
         <item quantity="many">%1$d épisodes seront supprimés de ce téléphone.</item>
         <item quantity="other">%1$d épisodes seront supprimés de ce téléphone.</item>
     </plurals>
+
+    <!-- Crossed-out cloud in the top bar while the server cannot be reached; read out by screen readers -->
+    <string name="offline">Hors ligne, téléchargements uniquement</string>
 </resources>

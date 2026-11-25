@@ -120,4 +120,7 @@
         <item quantity="one">%1$d Episod gëtt vun dësem Handy geläscht.</item>
         <item quantity="other">%1$d Episoden ginn vun dësem Handy geläscht.</item>
     </plurals>
+
+    <!-- Crossed-out cloud in the top bar while the server cannot be reached; read out by screen readers -->
+    <string name="offline">Offline, nëmmen Downloads</string>
 </resources>

@@ -14,6 +14,8 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkQuery
 import androidx.work.workDataOf
+import io.github.beal1031.fin2go.data.JellyfinClient
+import io.github.beal1031.fin2go.data.account.AccountStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -95,10 +97,32 @@ class DownloadRepository(context: Context) {
         folder(context, itemId).deleteRecursively()
     }
 
-    /** Removes a finished download from the phone. */
+    /** Removes a finished download from the phone, and the info of its series when it was the last episode. */
     suspend fun delete(itemId: String) = withContext(Dispatchers.IO) {
-        dataStore.edit { prefs -> prefs[downloadsKey] = Json.encodeToString(read(prefs) - itemId) }
+        var seriesId: String? = null
+        var seriesStillNeeded = false
+        dataStore.edit { prefs ->
+            val all = read(prefs)
+            seriesId = all[itemId]?.seriesId
+            val left = all - itemId
+            seriesStillNeeded = left.values.any { it.seriesId == seriesId }
+            prefs[downloadsKey] = Json.encodeToString(left)
+        }
         folder(context, itemId).deleteRecursively()
+        seriesId?.takeIf { !seriesStillNeeded }?.let { OfflineInfo.seriesFolder(context, it).deleteRecursively() }
+    }
+
+    /**
+     * Downloads from before the series info was saved too: fetches it now. Called when the server is reachable;
+     * if it fails, it is simply tried again next time.
+     */
+    suspend fun fillMissingSeries() = withContext(Dispatchers.IO) {
+        // Right at the start, the API client may not know the server yet.
+        val account = AccountStore(context).account.first() ?: return@withContext
+        JellyfinClient.api(context).update(baseUrl = account.serverUrl, accessToken = account.accessToken)
+        downloads.first().values.mapNotNull { it.seriesId }.distinct().forEach { seriesId ->
+            runCatching { OfflineInfo.saveSeriesIfMissing(context, seriesId) }
+        }
     }
 
     /** The downloaded video file of [itemId], or null when it is not (completely) downloaded. */
@@ -126,6 +150,9 @@ class DownloadRepository(context: Context) {
          * and it is removed together with the app.
          */
         fun folder(context: Context, itemId: String): File =
-            File(context.getExternalFilesDir(null) ?: context.filesDir, "downloads/$itemId")
+            File(root(context), itemId)
+
+        /** The folder of all downloads. */
+        fun root(context: Context): File = File(context.getExternalFilesDir(null) ?: context.filesDir, "downloads")
     }
 }
