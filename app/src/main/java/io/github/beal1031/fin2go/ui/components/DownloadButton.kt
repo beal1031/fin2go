@@ -58,41 +58,11 @@ fun DownloadButton(
     var confirming by rememberSaveable { mutableStateOf(confirmingInitially) }
     val download = rememberNotificationPermission(onDownload)
 
-    when (state) {
-        DownloadState.NotDownloaded -> {
-            val description = stringResource(R.string.download_start)
-            OutlinedIconButton(onClick = download, modifier = modifier) {
-                Icon(painter = painterResource(R.drawable.ic_download), contentDescription = description)
-            }
-        }
-
-        DownloadState.Waiting, is DownloadState.Downloading -> {
-            val progress = (state as? DownloadState.Downloading)?.progress
-            val description = if (progress == null) {
-                stringResource(R.string.download_waiting)
-            } else {
-                stringResource(R.string.download_running, (progress * 100).toInt())
-            }
-            OutlinedIconButton(
-                onClick = { confirming = true },
-                modifier = modifier.semantics { contentDescription = description },
-            ) {
-                val circleModifier = Modifier.size(24.dp)
-                if (progress == null) {
-                    CircularProgressIndicator(modifier = circleModifier, strokeWidth = 2.dp)
-                } else {
-                    CircularProgressIndicator(progress = { progress }, modifier = circleModifier, strokeWidth = 2.dp)
-                }
-            }
-        }
-
-        DownloadState.Downloaded -> {
-            val description = stringResource(R.string.download_done)
-            FilledIconButton(onClick = { confirming = true }, modifier = modifier) {
-                Icon(painter = painterResource(R.drawable.ic_download_done), contentDescription = description)
-            }
-        }
-    }
+    DownloadIconButton(
+        state = state,
+        onClick = { if (state == DownloadState.NotDownloaded) download() else confirming = true },
+        modifier = modifier,
+    )
 
     if (confirming) {
         when (state) {
@@ -121,8 +91,49 @@ fun DownloadButton(
     LaunchedEffect(state) { if (state == DownloadState.NotDownloaded) confirming = false }
 }
 
+/**
+ * Only the look of the download button for [state]: arrow, circle with the progress, or filled when downloaded.
+ * The series page uses it for a whole season, with its own questions.
+ */
 @Composable
-private fun ConfirmDialog(
+fun DownloadIconButton(state: DownloadState, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    when (state) {
+        DownloadState.NotDownloaded -> {
+            val description = stringResource(R.string.download_start)
+            OutlinedIconButton(onClick = onClick, modifier = modifier) {
+                Icon(painter = painterResource(R.drawable.ic_download), contentDescription = description)
+            }
+        }
+
+        DownloadState.Waiting, is DownloadState.Downloading -> {
+            val progress = (state as? DownloadState.Downloading)?.progress
+            val description = if (progress == null) {
+                stringResource(R.string.download_waiting)
+            } else {
+                stringResource(R.string.download_running, (progress * 100).toInt())
+            }
+            OutlinedIconButton(onClick = onClick, modifier = modifier.semantics { contentDescription = description }) {
+                val circleModifier = Modifier.size(24.dp)
+                if (progress == null) {
+                    CircularProgressIndicator(modifier = circleModifier, strokeWidth = 2.dp)
+                } else {
+                    CircularProgressIndicator(progress = { progress }, modifier = circleModifier, strokeWidth = 2.dp)
+                }
+            }
+        }
+
+        DownloadState.Downloaded -> {
+            val description = stringResource(R.string.download_done)
+            FilledIconButton(onClick = onClick, modifier = modifier) {
+                Icon(painter = painterResource(R.drawable.ic_download_done), contentDescription = description)
+            }
+        }
+    }
+}
+
+/** A question with a confirm and a dismiss button, for the download buttons. */
+@Composable
+fun ConfirmDialog(
     title: String,
     text: String,
     confirm: String,
@@ -144,7 +155,7 @@ private fun ConfirmDialog(
  * but its progress is not visible outside the app. So the first download asks; whatever the answer, it starts.
  */
 @Composable
-private fun rememberNotificationPermission(onDownload: () -> Unit): () -> Unit {
+fun rememberNotificationPermission(onDownload: () -> Unit): () -> Unit {
     // The previews have no activity that could ask.
     if (LocalInspectionMode.current || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return onDownload
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onDownload() }

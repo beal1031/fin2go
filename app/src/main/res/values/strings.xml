@@ -120,4 +120,21 @@
     <!-- Notification while downloading -->
     <string name="download_notification_channel">Downloads</string>
     <string name="download_notification_text">Downloading</string>
+
+    <!-- Download button of a season on the series page; %1$s is the season, e.g. Season 2 -->
+    <plurals name="download_season_title">
+        <item quantity="one">Download %1$d episode?</item>
+        <item quantity="other">Download %1$d episodes?</item>
+    </plurals>
+    <string name="download_season_text">The unwatched episodes of %1$s that are not on this phone yet, over Wi-Fi only.</string>
+    <!-- %2$s is the size, e.g. 7.2 GB -->
+    <string name="download_season_text_size">The unwatched episodes of %1$s that are not on this phone yet, about %2$s together, over Wi-Fi only.</string>
+    <string name="download_season_cancel_title">Cancel the downloads of %1$s?</string>
+    <string name="download_season_cancel_text">Episodes still loading are stopped and removed. Finished ones stay on the phone.</string>
+    <string name="download_season_cancel_confirm">Cancel downloads</string>
+    <string name="download_season_delete_title">Delete the downloads of %1$s?</string>
+    <plurals name="download_season_delete_text">
+        <item quantity="one">%1$d episode will be removed from this phone.</item>
+        <item quantity="other">%1$d episodes will be removed from this phone.</item>
+    </plurals>
 </resources>

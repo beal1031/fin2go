@@ -102,4 +102,20 @@
     <!-- Notification while downloading -->
     <string name="download_notification_channel">Downloads</string>
     <string name="download_notification_text">Wird heruntergeladen</string>
+
+    <!-- Download button of a season on the series page -->
+    <plurals name="download_season_title">
+        <item quantity="one">%1$d Folge herunterladen?</item>
+        <item quantity="other">%1$d Folgen herunterladen?</item>
+    </plurals>
+    <string name="download_season_text">Die ungesehenen Folgen von %1$s, die noch nicht auf diesem Handy sind, nur über WLAN.</string>
+    <string name="download_season_text_size">Die ungesehenen Folgen von %1$s, die noch nicht auf diesem Handy sind, zusammen etwa %2$s, nur über WLAN.</string>
+    <string name="download_season_cancel_title">Downloads von %1$s abbrechen?</string>
+    <string name="download_season_cancel_text">Folgen, die noch laden, werden gestoppt und gelöscht. Fertige bleiben auf dem Handy.</string>
+    <string name="download_season_cancel_confirm">Downloads abbrechen</string>
+    <string name="download_season_delete_title">Downloads von %1$s löschen?</string>
+    <plurals name="download_season_delete_text">
+        <item quantity="one">%1$d Folge wird von diesem Handy gelöscht.</item>
+        <item quantity="other">%1$d Folgen werden von diesem Handy gelöscht.</item>
+    </plurals>
 </resources>

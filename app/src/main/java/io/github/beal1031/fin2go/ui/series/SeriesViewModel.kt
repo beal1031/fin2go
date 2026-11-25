@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.beal1031.fin2go.data.download.DownloadRepository
+import io.github.beal1031.fin2go.data.download.DownloadState
 import io.github.beal1031.fin2go.data.media.EpisodeDetails
 import io.github.beal1031.fin2go.data.media.MediaRepository
 import io.github.beal1031.fin2go.data.media.SeriesDetails
 import io.github.beal1031.fin2go.data.playback.ProgressSync
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -16,6 +18,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -27,6 +31,21 @@ data class SeriesState(
     val error: Boolean = false,
     val series: SeriesDetails? = null,
     val selectedSeason: Int? = null,
+    /** The download button of the chosen season; null when there is nothing to download or delete. */
+    val seasonDownload: SeasonDownload? = null,
+)
+
+/**
+ * What the download button of a season shows ([state]: the whole season together) and what it changes.
+ */
+data class SeasonDownload(
+    val state: DownloadState,
+    /** The unwatched episodes that are not on the phone yet: downloaded on a tap. */
+    val missing: List<EpisodeDetails> = emptyList(),
+    /** Episodes waiting or loading right now: cancelled together. */
+    val runningIds: List<String> = emptyList(),
+    /** Episodes on the phone: deleted together. */
+    val downloadedIds: List<String> = emptyList(),
 )
 
 /**
@@ -43,11 +62,27 @@ class SeriesViewModel(
     private val downloads = DownloadRepository(application)
 
     private val _state = MutableStateFlow(SeriesState())
-    /** The loaded series, with the downloaded episodes marked. */
-    val state: StateFlow<SeriesState> = combine(_state, downloads.downloads.map { it.keys }) { state, downloaded ->
+    /** How far the download of each episode is, updated while they run. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val episodeDownloads = _state
+        .map { state -> state.series?.episodes?.map { it.id }.orEmpty() }
+        .distinctUntilChanged()
+        .flatMapLatest { downloads.states(it) }
+
+    /** The loaded series, with the downloaded episodes marked and the download button of the chosen season. */
+    val state: StateFlow<SeriesState> = combine(_state, episodeDownloads) { state, downloadStates ->
+        val series = state.series?.let { series ->
+            series.copy(
+                episodes = series.episodes.map { it.copy(downloaded = downloadStates[it.id] == DownloadState.Downloaded) },
+            )
+        }
+        val season = state.selectedSeason
         state.copy(
-            series = state.series?.let { series ->
-                series.copy(episodes = series.episodes.map { it.copy(downloaded = it.id in downloaded) })
+            series = series,
+            seasonDownload = if (series != null && season != null) {
+                seasonDownload(series.episodesOf(season), downloadStates)
+            } else {
+                null
             },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, _state.value)
@@ -168,6 +203,51 @@ class SeriesViewModel(
         }
     }
 
+    /** Downloads all unwatched episodes of the chosen season that are not on the phone yet. */
+    fun downloadSeason() {
+        state.value.seasonDownload?.missing?.forEach { downloads.start(it.id) }
+    }
+
+    /** Stops all downloads of the chosen season that are still waiting or loading. Finished ones stay. */
+    fun cancelSeasonDownloads() {
+        val ids = state.value.seasonDownload?.runningIds ?: return
+        viewModelScope.launch { ids.forEach { downloads.cancel(it) } }
+    }
+
+    /** Removes all downloaded episodes of the chosen season from the phone. */
+    fun deleteSeasonDownloads() {
+        val ids = state.value.seasonDownload?.downloadedIds ?: return
+        viewModelScope.launch { ids.forEach { downloads.delete(it) } }
+    }
+
     private fun SeriesDetails.withEpisode(episode: EpisodeDetails) =
         copy(episodes = episodes.map { if (it.id == episode.id) episode else it })
+}
+
+/**
+ * The download button of a season, from the episodes of that season and how far each download is.
+ * Loading while any episode waits or loads, with the share of the whole batch; the arrow while unwatched episodes
+ * are missing; done when all unwatched episodes are on the phone. Null when there is nothing to download or delete.
+ */
+private fun seasonDownload(episodes: List<EpisodeDetails>, states: Map<String, DownloadState>): SeasonDownload? {
+    fun stateOf(episode: EpisodeDetails) = states[episode.id] ?: DownloadState.NotDownloaded
+    val running = episodes.filter { stateOf(it) is DownloadState.Downloading || stateOf(it) == DownloadState.Waiting }
+    val downloadedIds = episodes.filter { stateOf(it) == DownloadState.Downloaded }.map { it.id }
+    val missing = episodes.filter { !it.watched && stateOf(it) == DownloadState.NotDownloaded }
+    val runningIds = running.map { it.id }
+    val state = when {
+        running.isNotEmpty() -> {
+            val progress = running.mapNotNull { (stateOf(it) as? DownloadState.Downloading)?.progress }
+            if (progress.isEmpty() && downloadedIds.isEmpty()) {
+                DownloadState.Waiting
+            } else {
+                // Finished episodes count as done, waiting ones as not started.
+                DownloadState.Downloading((downloadedIds.size + progress.sum()) / (downloadedIds.size + running.size))
+            }
+        }
+        missing.isNotEmpty() -> DownloadState.NotDownloaded
+        downloadedIds.isNotEmpty() -> DownloadState.Downloaded
+        else -> return null
+    }
+    return SeasonDownload(state, missing, runningIds, downloadedIds)
 }

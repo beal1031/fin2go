@@ -1,5 +1,6 @@
 package io.github.beal1031.fin2go.ui.series
 
+import android.text.format.Formatter
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -56,6 +58,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
 import io.github.beal1031.fin2go.R
+import io.github.beal1031.fin2go.data.download.DownloadState
 import io.github.beal1031.fin2go.data.media.EpisodeDetails
 import io.github.beal1031.fin2go.data.media.SeriesDetails
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
@@ -66,7 +69,10 @@ import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.DetailHeader
 import io.github.beal1031.fin2go.ui.components.PlayButtons
 import io.github.beal1031.fin2go.ui.components.WatchedButton
+import io.github.beal1031.fin2go.ui.components.ConfirmDialog
+import io.github.beal1031.fin2go.ui.components.DownloadIconButton
 import io.github.beal1031.fin2go.ui.components.DownloadedIcon
+import io.github.beal1031.fin2go.ui.components.rememberNotificationPermission
 import io.github.beal1031.fin2go.ui.components.episodeLabel
 import io.github.beal1031.fin2go.ui.components.runtimeText
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
@@ -93,6 +99,8 @@ fun SeriesScreen(
     var overviewExpanded by rememberSaveable { mutableStateOf(false) }
     // Whether the question "Mark season … as watched?" is open.
     var confirmingSeason by rememberSaveable { mutableStateOf(false) }
+    // Whether the question of the season's download button is open.
+    var confirmingSeasonDownload by rememberSaveable { mutableStateOf(false) }
 
     SeriesContent(
         state = state,
@@ -109,6 +117,21 @@ fun SeriesScreen(
         onMarkSeason = { season, watched ->
             confirmingSeason = false
             viewModel.setSeasonWatched(season, watched)
+        },
+        confirmingSeasonDownload = confirmingSeasonDownload,
+        onAskSeasonDownload = { confirmingSeasonDownload = true },
+        onDismissSeasonDownload = { confirmingSeasonDownload = false },
+        onDownloadSeason = {
+            confirmingSeasonDownload = false
+            viewModel.downloadSeason()
+        },
+        onCancelSeasonDownloads = {
+            confirmingSeasonDownload = false
+            viewModel.cancelSeasonDownloads()
+        },
+        onDeleteSeasonDownloads = {
+            confirmingSeasonDownload = false
+            viewModel.deleteSeasonDownloads()
         },
         statusBarHeight = statusBarHeight,
         modifier = modifier,
@@ -133,6 +156,12 @@ fun SeriesContent(
     onAskMarkSeason: () -> Unit,
     onDismissMarkSeason: () -> Unit,
     onMarkSeason: (season: Int, watched: Boolean) -> Unit,
+    confirmingSeasonDownload: Boolean,
+    onAskSeasonDownload: () -> Unit,
+    onDismissSeasonDownload: () -> Unit,
+    onDownloadSeason: () -> Unit,
+    onCancelSeasonDownloads: () -> Unit,
+    onDeleteSeasonDownloads: () -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -155,6 +184,8 @@ fun SeriesContent(
                 onShowDetails = onShowDetails,
                 onToggleWatched = onToggleWatched,
                 onAskMarkSeason = onAskMarkSeason,
+                seasonDownload = state.seasonDownload,
+                onAskSeasonDownload = onAskSeasonDownload,
                 statusBarHeight = statusBarHeight,
             )
         }
@@ -163,6 +194,17 @@ fun SeriesContent(
     val season = state.selectedSeason
     if (confirmingSeason && series != null && season != null) {
         MarkSeasonDialog(series, season, onConfirm = onMarkSeason, onDismiss = onDismissMarkSeason)
+    }
+    val seasonDownload = state.seasonDownload
+    if (confirmingSeasonDownload && seasonDownload != null && season != null) {
+        SeasonDownloadDialog(
+            download = seasonDownload,
+            season = season,
+            onDownload = onDownloadSeason,
+            onCancel = onCancelSeasonDownloads,
+            onDelete = onDeleteSeasonDownloads,
+            onDismiss = onDismissSeasonDownload,
+        )
     }
 }
 
@@ -181,6 +223,8 @@ private fun SeriesDetailsView(
     onShowDetails: (EpisodeDetails) -> Unit,
     onToggleWatched: (EpisodeDetails) -> Unit,
     onAskMarkSeason: () -> Unit,
+    seasonDownload: SeasonDownload?,
+    onAskSeasonDownload: () -> Unit,
     statusBarHeight: Dp,
 ) {
     Column(
@@ -235,6 +279,8 @@ private fun SeriesDetailsView(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
+                // Asks first, see SeasonDownloadDialog.
+                seasonDownload?.let { DownloadIconButton(state = it.state, onClick = onAskSeasonDownload) }
                 // Asks first, see MarkSeasonDialog.
                 TextButton(onClick = onAskMarkSeason) {
                     Text(
@@ -405,6 +451,63 @@ private fun NumberTile(
 }
 
 /**
+ * The question of the season's download button, depending on its state: download the missing unwatched episodes
+ * (with their number and size), cancel the running downloads, or delete the downloaded episodes.
+ */
+@Composable
+private fun SeasonDownloadDialog(
+    download: SeasonDownload,
+    season: Int,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val name = if (season == 0) stringResource(R.string.series_specials)
+    else stringResource(R.string.series_season_number, season)
+    when (download.state) {
+        DownloadState.NotDownloaded -> {
+            val count = download.missing.size
+            // Only when the server knows the size of every episode, so the total is not too small.
+            val size = download.missing.map { it.sizeBytes }.takeIf { sizes -> sizes.all { it != null } }
+                ?.sumOf { it ?: 0L }
+                ?.let { Formatter.formatShortFileSize(LocalContext.current, it) }
+            ConfirmDialog(
+                title = pluralStringResource(R.plurals.download_season_title, count, count),
+                text = if (size != null) stringResource(R.string.download_season_text_size, name, size)
+                else stringResource(R.string.download_season_text, name),
+                confirm = stringResource(R.string.download_start),
+                dismiss = stringResource(R.string.cancel),
+                // From Android 13 on, the first download asks whether the app may show its progress.
+                onConfirm = rememberNotificationPermission(onDownload),
+                onDismiss = onDismiss,
+            )
+        }
+
+        DownloadState.Waiting, is DownloadState.Downloading -> ConfirmDialog(
+            title = stringResource(R.string.download_season_cancel_title, name),
+            text = stringResource(R.string.download_season_cancel_text),
+            confirm = stringResource(R.string.download_season_cancel_confirm),
+            dismiss = stringResource(R.string.download_cancel_keep),
+            onConfirm = onCancel,
+            onDismiss = onDismiss,
+        )
+
+        DownloadState.Downloaded -> {
+            val count = download.downloadedIds.size
+            ConfirmDialog(
+                title = stringResource(R.string.download_season_delete_title, name),
+                text = pluralStringResource(R.plurals.download_season_delete_text, count, count),
+                confirm = stringResource(R.string.download_delete_confirm),
+                dismiss = stringResource(R.string.cancel),
+                onConfirm = onDelete,
+                onDismiss = onDismiss,
+            )
+        }
+    }
+}
+
+/**
  * One episode: picture (with a bar when started), number, name and running time.
  * On the right, one above the other: the watched button and the "i" for the episode page.
  * A tap on the line itself plays the episode.
@@ -555,7 +658,12 @@ private fun season(number: Int, series: SeriesDetails = sampleSeries) =
     SeriesState(loading = false, series = series, selectedSeason = number)
 
 @Composable
-private fun SeriesPreview(state: SeriesState, overviewExpanded: Boolean = false, confirmingSeason: Boolean = false) {
+private fun SeriesPreview(
+    state: SeriesState,
+    overviewExpanded: Boolean = false,
+    confirmingSeason: Boolean = false,
+    confirmingSeasonDownload: Boolean = false,
+) {
     Fin2goTheme {
         WithPreviewImages {
             // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
@@ -577,6 +685,12 @@ private fun SeriesPreview(state: SeriesState, overviewExpanded: Boolean = false,
                         onAskMarkSeason = {},
                         onDismissMarkSeason = {},
                         onMarkSeason = { _, _ -> },
+                        confirmingSeasonDownload = confirmingSeasonDownload,
+                        onAskSeasonDownload = {},
+                        onDismissSeasonDownload = {},
+                        onDownloadSeason = {},
+                        onCancelSeasonDownloads = {},
+                        onDeleteSeasonDownloads = {},
                         statusBarHeight = statusBarHeight,
                     )
                     AppTopBar(
@@ -680,6 +794,53 @@ private val downloadedSeries = sampleSeries.copy(
     episodes = sampleEpisodes.map { it.copy(downloaded = it.id == "e2" || it.id == "e3") },
 )
 
-@Preview(name = "10 Downloaded episodes marked", showSystemUi = true, device = PREVIEW_PHONE)
+/** Season 1 with its download button in [download]; e2 and e3 are on the phone in the episode list. */
+private fun seasonWithDownload(download: SeasonDownload) = season(1, downloadedSeries).copy(seasonDownload = download)
+
+private val missingEpisodes = sampleEpisodes.filter { it.seasonNumber == 1 && !it.watched }
+    .map { it.copy(sizeBytes = 1_450_000_000L) }
+
+@Preview(name = "10 Downloaded episodes marked, season button: download", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
-private fun SeriesDownloadedPreview() = SeriesPreview(season(1, downloadedSeries))
+private fun SeriesDownloadedPreview() =
+    SeriesPreview(seasonWithDownload(SeasonDownload(DownloadState.NotDownloaded, missing = missingEpisodes)))
+
+@Preview(name = "10b Season button: loading", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun SeriesSeasonLoadingPreview() =
+    SeriesPreview(seasonWithDownload(SeasonDownload(DownloadState.Downloading(0.6f), runningIds = listOf("e3"))))
+
+@Preview(name = "10c Season button: all unwatched downloaded", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun SeriesSeasonDownloadedPreview() =
+    SeriesPreview(seasonWithDownload(SeasonDownload(DownloadState.Downloaded, downloadedIds = listOf("e2", "e3"))))
+
+@Preview(name = "11 Question: download season", showSystemUi = true, device = PREVIEW_PHONE)
+@Preview(name = "11b German", showSystemUi = true, device = PREVIEW_PHONE, locale = "de")
+@Preview(name = "11c French", showSystemUi = true, device = PREVIEW_PHONE, locale = "fr")
+@Preview(name = "11d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
+@Composable
+private fun SeriesSeasonDownloadQuestionPreview() = SeriesPreview(
+    seasonWithDownload(SeasonDownload(DownloadState.NotDownloaded, missing = missingEpisodes)),
+    confirmingSeasonDownload = true,
+)
+
+@Preview(name = "12 Question: cancel season downloads", showSystemUi = true, device = PREVIEW_PHONE)
+@Preview(name = "12b German", showSystemUi = true, device = PREVIEW_PHONE, locale = "de")
+@Preview(name = "12c French", showSystemUi = true, device = PREVIEW_PHONE, locale = "fr")
+@Preview(name = "12d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
+@Composable
+private fun SeriesSeasonCancelQuestionPreview() = SeriesPreview(
+    seasonWithDownload(SeasonDownload(DownloadState.Downloading(0.6f), runningIds = listOf("e3"))),
+    confirmingSeasonDownload = true,
+)
+
+@Preview(name = "13 Question: delete season downloads", showSystemUi = true, device = PREVIEW_PHONE)
+@Preview(name = "13b German", showSystemUi = true, device = PREVIEW_PHONE, locale = "de")
+@Preview(name = "13c French", showSystemUi = true, device = PREVIEW_PHONE, locale = "fr")
+@Preview(name = "13d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
+@Composable
+private fun SeriesSeasonDeleteQuestionPreview() = SeriesPreview(
+    seasonWithDownload(SeasonDownload(DownloadState.Downloaded, downloadedIds = listOf("e2", "e3"))),
+    confirmingSeasonDownload = true,
+)

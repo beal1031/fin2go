@@ -104,4 +104,22 @@
     <!-- Notification while downloading -->
     <string name="download_notification_channel">Téléchargements</string>
     <string name="download_notification_text">Téléchargement en cours</string>
+
+    <!-- Download button of a season on the series page -->
+    <plurals name="download_season_title">
+        <item quantity="one">Télécharger %1$d épisode ?</item>
+        <item quantity="many">Télécharger %1$d épisodes ?</item>
+        <item quantity="other">Télécharger %1$d épisodes ?</item>
+    </plurals>
+    <string name="download_season_text">Les épisodes non vus de %1$s qui ne sont pas encore sur ce téléphone, uniquement en Wi-Fi.</string>
+    <string name="download_season_text_size">Les épisodes non vus de %1$s qui ne sont pas encore sur ce téléphone, environ %2$s au total, uniquement en Wi-Fi.</string>
+    <string name="download_season_cancel_title">Annuler les téléchargements de %1$s ?</string>
+    <string name="download_season_cancel_text">Les épisodes encore en cours sont arrêtés et supprimés. Ceux qui sont terminés restent sur le téléphone.</string>
+    <string name="download_season_cancel_confirm">Annuler les téléchargements</string>
+    <string name="download_season_delete_title">Supprimer les téléchargements de %1$s ?</string>
+    <plurals name="download_season_delete_text">
+        <item quantity="one">%1$d épisode sera supprimé de ce téléphone.</item>
+        <item quantity="many">%1$d épisodes seront supprimés de ce téléphone.</item>
+        <item quantity="other">%1$d épisodes seront supprimés de ce téléphone.</item>
+    </plurals>
 </resources>

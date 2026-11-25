@@ -149,8 +149,8 @@ class MediaRepository(context: Context) {
             val episodes = async {
                 api.showApi.getEpisodes(
                     seriesId = seriesId,
-                    // The description of an episode is only sent when asked for.
-                    fields = listOf(ItemFields.OVERVIEW),
+                    // The description and the file (for its size) are only sent when asked for.
+                    fields = listOf(ItemFields.OVERVIEW, ItemFields.MEDIA_SOURCES),
                     // Episodes the server only knows from the internet, without a file, are left out.
                     isMissing = false,
                     enableUserData = true,
@@ -235,6 +235,7 @@ class MediaRepository(context: Context) {
             progress = startedRuntime?.let { (position.toFloat() / it).coerceIn(0f, 1f) },
             remainingMinutes = startedRuntime?.let { minutes(it - position).coerceAtLeast(1) },
             watched = startedRuntime == null && userData?.played == true,
+            sizeBytes = mediaSources?.firstOrNull()?.size,
         )
         return Episode(details, userData?.lastPlayedDate)
     }

@@ -104,4 +104,20 @@
     <!-- Notification while downloading -->
     <string name="download_notification_channel">Downloads</string>
     <string name="download_notification_text">Gëtt erofgelueden</string>
+
+    <!-- Download button of a season on the series page (drafts, to be checked) -->
+    <plurals name="download_season_title">
+        <item quantity="one">%1$d Episod eroflueden?</item>
+        <item quantity="other">%1$d Episoden eroflueden?</item>
+    </plurals>
+    <string name="download_season_text">Déi net gekuckten Episoden vu %1$s, déi nach net op dësem Handy sinn, nëmmen iwwer WLAN.</string>
+    <string name="download_season_text_size">Déi net gekuckten Episoden vu %1$s, déi nach net op dësem Handy sinn, zesumme ronn %2$s, nëmmen iwwer WLAN.</string>
+    <string name="download_season_cancel_title">Downloads vu %1$s ofbriechen?</string>
+    <string name="download_season_cancel_text">Episoden, déi nach lueden, ginn gestoppt a geläscht. Fäerdeger bleiwen um Handy.</string>
+    <string name="download_season_cancel_confirm">Downloads ofbriechen</string>
+    <string name="download_season_delete_title">Downloads vu %1$s läschen?</string>
+    <plurals name="download_season_delete_text">
+        <item quantity="one">%1$d Episod gëtt vun dësem Handy geläscht.</item>
+        <item quantity="other">%1$d Episoden ginn vun dësem Handy geläscht.</item>
+    </plurals>
 </resources>

@@ -67,4 +67,6 @@ data class EpisodeDetails(
     val watched: Boolean = false,
     /** Downloaded to this phone. */
     val downloaded: Boolean = false,
+    /** Size of the video file, for the question before a whole season is downloaded. */
+    val sizeBytes: Long? = null,
 )

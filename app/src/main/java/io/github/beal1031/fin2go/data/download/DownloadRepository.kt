@@ -12,12 +12,14 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.work.WorkQuery
 import androidx.work.workDataOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -39,19 +41,32 @@ class DownloadRepository(context: Context) {
     val downloads: Flow<Map<String, Download>> = dataStore.data.map(::read)
 
     /** How far the download of [itemId] is, updated while it runs. */
-    fun state(itemId: String): Flow<DownloadState> = combine(
-        downloads.map { itemId in it }.distinctUntilChanged(),
-        workManager.getWorkInfosForUniqueWorkFlow(workName(itemId)).map { it.firstOrNull() },
-    ) { downloaded, work ->
-        when {
-            downloaded -> DownloadState.Downloaded
-            work?.state == WorkInfo.State.RUNNING ->
-                DownloadState.Downloading(work.progress.getFloat(DownloadWorker.PROGRESS, -1f).takeIf { it >= 0f })
-            work?.state == WorkInfo.State.ENQUEUED || work?.state == WorkInfo.State.BLOCKED -> DownloadState.Waiting
-            // Not started, cancelled or failed.
-            else -> DownloadState.NotDownloaded
-        }
-    }.distinctUntilChanged()
+    fun state(itemId: String): Flow<DownloadState> =
+        states(listOf(itemId)).map { it.getValue(itemId) }.distinctUntilChanged()
+
+    /** How far the download of each of [itemIds] is, updated while they run. */
+    fun states(itemIds: List<String>): Flow<Map<String, DownloadState>> {
+        if (itemIds.isEmpty()) return flowOf(emptyMap())
+        return combine(
+            downloads.map { it.keys }.distinctUntilChanged(),
+            workManager.getWorkInfosFlow(WorkQuery.fromUniqueWorkNames(itemIds.map(::workName))),
+        ) { downloaded, works ->
+            itemIds.associateWith { id ->
+                // A running or waiting job counts before an old, finished one.
+                val work = works.filter { "$ITEM_TAG$id" in it.tags }.minByOrNull { if (it.state.isFinished) 1 else 0 }
+                when {
+                    id in downloaded -> DownloadState.Downloaded
+                    work?.state == WorkInfo.State.RUNNING -> DownloadState.Downloading(
+                        work.progress.getFloat(DownloadWorker.PROGRESS, -1f).takeIf { it >= 0f },
+                    )
+                    work?.state == WorkInfo.State.ENQUEUED || work?.state == WorkInfo.State.BLOCKED ->
+                        DownloadState.Waiting
+                    // Not started, cancelled or failed.
+                    else -> DownloadState.NotDownloaded
+                }
+            }
+        }.distinctUntilChanged()
+    }
 
     /**
      * Downloads the movie or episode in the background, only over Wi-Fi.
@@ -60,6 +75,8 @@ class DownloadRepository(context: Context) {
     fun start(itemId: String) {
         val request = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(workDataOf(DownloadWorker.ITEM_ID to itemId))
+            // So the job can be found again by its item, see [states].
+            .addTag("$ITEM_TAG$itemId")
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.UNMETERED)
@@ -102,6 +119,7 @@ class DownloadRepository(context: Context) {
         private val downloadsKey = stringPreferencesKey("downloads")
 
         private fun workName(itemId: String) = "download-$itemId"
+        private const val ITEM_TAG = "download-item:"
 
         /**
          * The folder of one download, in the app's own storage: other apps cannot see it,
