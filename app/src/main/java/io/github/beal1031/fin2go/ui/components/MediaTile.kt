@@ -5,6 +5,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +41,8 @@ import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
  * Wide tile (16:9, with progress bar) or poster tile (2:3), with the title below.
  * The width comes from [modifier]: fixed in a row, the cell width in a grid.
  * Without [onClick] and [onLongClick], the tile does not react to touch.
+ * A downloaded movie or episode gets a sign: on a poster in the bottom left corner (the watched check mark is on
+ * the right), on a wide tile next to the episode number, or next to the title when there is none.
  */
 @Composable
 fun MediaTile(
@@ -73,6 +76,21 @@ fun MediaTile(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            if (item.downloaded && !wide) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_download_done),
+                    contentDescription = stringResource(R.string.download_done),
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        // Above the progress bar, when there is one.
+                        .padding(start = 6.dp, end = 6.dp, bottom = if (item.progress != null) 14.dp else 6.dp)
+                        .size(24.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary)
+                        .padding(3.dp),
+                )
+            }
             // Only the watched part is drawn, from the left edge; nothing for unwatched items.
             item.progress?.let { progress ->
                 Box(
@@ -101,18 +119,26 @@ fun MediaTile(
                 )
             }
         }
-        Text(
-            text = item.title,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (item.seasonNumber != null && item.episodeNumber != null) {
+        val isEpisode = item.seasonNumber != null && item.episodeNumber != null
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
-                text = stringResource(R.string.episode_number, item.seasonNumber, item.episodeNumber),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = item.title,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            if (item.downloaded && wide && !isEpisode) DownloadedIcon()
+        }
+        if (item.seasonNumber != null && item.episodeNumber != null) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.episode_number, item.seasonNumber, item.episodeNumber),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (item.downloaded && wide) DownloadedIcon()
+            }
         }
     }
 }
@@ -169,3 +195,49 @@ private fun MediaTileEpisodePreview() = MediaTilePreview(
 @Preview(name = "5 Poster, no picture", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun MediaTileNoPicturePreview() = MediaTilePreview(MediaItem(id = "1", title = "Sintel"))
+
+@Preview(name = "6 Poster, downloaded", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MediaTileDownloadedPreview() = MediaTilePreview(
+    MediaItem(id = "1", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url, downloaded = true),
+)
+
+@Preview(name = "6b Poster, downloaded and watched", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MediaTileDownloadedWatchedPreview() = MediaTilePreview(
+    MediaItem(id = "1", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url, watched = true, downloaded = true),
+)
+
+@Preview(name = "6c Poster, downloaded and started", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MediaTileDownloadedStartedPreview() = MediaTilePreview(
+    MediaItem(id = "1", title = "Sintel", imageUrl = PreviewImage.POSTER_SINTEL.url, progress = 0.4f, downloaded = true),
+)
+
+@Preview(name = "6d Wide, downloaded episode", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MediaTileDownloadedEpisodePreview() = MediaTilePreview(
+    MediaItem(
+        id = "1",
+        title = "Caminandes",
+        seasonNumber = 1,
+        episodeNumber = 3,
+        imageUrl = PreviewImage.EPISODE_CAMINANDES_3.url,
+        progress = 0.4f,
+        downloaded = true,
+    ),
+    wide = true,
+)
+
+@Preview(name = "6e Wide, downloaded movie", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MediaTileDownloadedWideMoviePreview() = MediaTilePreview(
+    MediaItem(
+        id = "1",
+        title = "Tears of Steel",
+        imageUrl = PreviewImage.BACKDROP_TEARS_OF_STEEL.url,
+        progress = 0.4f,
+        downloaded = true,
+    ),
+    wide = true,
+)

@@ -2,6 +2,7 @@ package io.github.beal1031.fin2go.data.playback
 
 import android.content.Context
 import io.github.beal1031.fin2go.data.JellyfinClient
+import io.github.beal1031.fin2go.data.download.DownloadRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -13,6 +14,7 @@ import org.jellyfin.sdk.api.client.extensions.sessionApi
 import org.jellyfin.sdk.api.client.extensions.showApi
 import org.jellyfin.sdk.api.client.extensions.videoApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
+import androidx.core.net.toUri
 import androidx.media3.common.MimeTypes
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaSegmentType
@@ -79,6 +81,8 @@ data class Playback(val info: PlaybackInfo, val stream: Stream, val startPositio
 /** Asks the server how to play a movie or episode, and tells it how far the user is. */
 class PlaybackRepository(context: Context) {
     private val api = JellyfinClient.api(context)
+    private val downloads = DownloadRepository(context)
+    private val progressSync = ProgressSync(context)
 
     /** Sent with every request of the player, so the server knows the user. */
     fun authorizationHeader(): String = AuthorizationHeaderBuilder.buildHeader(
@@ -151,6 +155,8 @@ class PlaybackRepository(context: Context) {
      * With [maxBitrate] (bits per second) the server converts everything above it down to that size;
      * without, the phone gets the best it can play. [audioIndex] and [subtitleIndex] choose the tracks
      * (-1: no subtitles); null leaves the choice to the server and the user's settings in Jellyfin.
+     * A downloaded item is always played from its file on the phone, in its original quality; the server still
+     * tells which tracks it has, because it is the same file.
      */
     suspend fun stream(id: String, maxBitrate: Int?, audioIndex: Int?, subtitleIndex: Int?): Stream = withContext(Dispatchers.IO) {
         val itemId = UUID.fromString(id)
@@ -170,8 +176,10 @@ class PlaybackRepository(context: Context) {
         info.errorCode?.let { error("Server refused playback: $it") }
         val source = info.mediaSources.firstOrNull() ?: error("Item has no playable file")
         val transcodingUrl = source.transcodingUrl
-        val directPlay = source.supportsDirectPlay
+        val localFile = downloads.localFile(id)
+        val directPlay = localFile != null || source.supportsDirectPlay
         val url = when {
+            localFile != null -> localFile.toUri().toString()
             directPlay -> api.videoApi.getVideoStreamUrl(
                 itemId = itemId,
                 static = true,
@@ -224,7 +232,7 @@ class PlaybackRepository(context: Context) {
     }
 
     /** Playback has begun. */
-    suspend fun reportStart(stream: Stream, positionMs: Long, paused: Boolean) = report {
+    suspend fun reportStart(stream: Stream, positionMs: Long, paused: Boolean) = reportPosition(stream, positionMs) {
         api.sessionApi.reportPlaybackStart(
             PlaybackStartInfo(
                 itemId = stream.itemId,
@@ -242,7 +250,7 @@ class PlaybackRepository(context: Context) {
     }
 
     /** Where the user is right now. The server saves it as the position to continue from. */
-    suspend fun reportProgress(stream: Stream, positionMs: Long, paused: Boolean) = report {
+    suspend fun reportProgress(stream: Stream, positionMs: Long, paused: Boolean) = reportPosition(stream, positionMs) {
         api.sessionApi.reportPlaybackProgress(
             PlaybackProgressInfo(
                 itemId = stream.itemId,
@@ -263,7 +271,7 @@ class PlaybackRepository(context: Context) {
      * Playback has ended. The server saves the position, stops converting the file and
      * marks the item as watched when the user got near the end.
      */
-    suspend fun reportStopped(stream: Stream, positionMs: Long) = report {
+    suspend fun reportStopped(stream: Stream, positionMs: Long) = reportPosition(stream, positionMs) {
         api.sessionApi.reportPlaybackStopped(
             PlaybackStopInfo(
                 itemId = stream.itemId,
@@ -277,9 +285,30 @@ class PlaybackRepository(context: Context) {
 
     private val Stream.playMethod get() = if (directPlay) PlayMethod.DIRECT_PLAY else PlayMethod.TRANSCODE
 
-    /** A failed report must not stop the video, e.g. when the connection drops for a moment. */
-    private suspend fun report(block: suspend () -> Unit) {
-        withContext(Dispatchers.IO) { runCatching { block() } }
+    /** The last position the server got for each item, in this playback. */
+    private val lastSentMs = mutableMapOf<String, Long>()
+
+    /**
+     * Sends a report. A failed report must not stop the video, e.g. when the connection drops for a moment.
+     * When the server cannot be reached, e.g. while watching a download without internet, the position is kept
+     * and sent later (see [ProgressSync]).
+     */
+    private suspend fun reportPosition(stream: Stream, positionMs: Long, block: suspend () -> Unit) {
+        withContext(Dispatchers.IO) {
+            val id = stream.itemId.toString()
+            if (runCatching { block() }.isSuccess) {
+                lastSentMs[id] = positionMs
+                progressSync.forget(id)
+            } else {
+                progressSync.remember(
+                    itemId = id,
+                    positionMs = positionMs,
+                    serverPositionMs = lastSentMs[id],
+                    mediaSourceId = stream.mediaSourceId,
+                    playSessionId = stream.playSessionId,
+                )
+            }
+        }
     }
 
     /** The server counts in ticks of 100 nanoseconds: 10,000 ticks are one millisecond. */

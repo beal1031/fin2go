@@ -3,16 +3,21 @@ package io.github.beal1031.fin2go.ui.series
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.beal1031.fin2go.data.download.DownloadRepository
 import io.github.beal1031.fin2go.data.media.EpisodeDetails
 import io.github.beal1031.fin2go.data.media.MediaRepository
 import io.github.beal1031.fin2go.data.media.SeriesDetails
+import io.github.beal1031.fin2go.data.playback.ProgressSync
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -35,12 +40,22 @@ class SeriesViewModel(
     private val episodeId: String?,
 ) : AndroidViewModel(application) {
     private val media = MediaRepository(application)
+    private val downloads = DownloadRepository(application)
 
     private val _state = MutableStateFlow(SeriesState())
-    val state: StateFlow<SeriesState> = _state.asStateFlow()
+    /** The loaded series, with the downloaded episodes marked. */
+    val state: StateFlow<SeriesState> = combine(_state, downloads.downloads.map { it.keys }) { state, downloaded ->
+        state.copy(
+            series = state.series?.let { series ->
+                series.copy(episodes = series.episodes.map { it.copy(downloaded = it.id in downloaded) })
+            },
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _state.value)
 
     init {
         reload()
+        // Progress watched without internet reached the server later: show it.
+        viewModelScope.launch { ProgressSync(getApplication()).sent.collect { refresh() } }
     }
 
     /** Loads the series again. On failure, the error with a retry button is shown. */

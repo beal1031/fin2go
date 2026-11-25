@@ -33,6 +33,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
 import io.github.beal1031.fin2go.data.media.MediaItem
+import io.github.beal1031.fin2go.data.media.withDownloads
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
 import io.github.beal1031.fin2go.ui.PreviewImage
 import io.github.beal1031.fin2go.ui.WithPreviewImages
@@ -291,3 +292,14 @@ private fun HomeErrorPreview() = HomePreview(HomeState(loading = false, error = 
 @Preview(name = "4 Nothing on the server yet", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun HomeEmptyPreview() = HomePreview(HomeState(loading = false))
+
+private val downloadedIds = setOf("1", "2", "8")
+
+@Preview(name = "5 Downloads marked", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun HomeDownloadedPreview() = HomePreview(
+    sampleState.copy(
+        continueWatching = sampleState.continueWatching.withDownloads(downloadedIds),
+        latestMovies = sampleState.latestMovies.withDownloads(downloadedIds),
+    ),
+)

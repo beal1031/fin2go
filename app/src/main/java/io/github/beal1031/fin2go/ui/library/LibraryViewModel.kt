@@ -5,12 +5,17 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.beal1031.fin2go.R
+import io.github.beal1031.fin2go.data.download.DownloadRepository
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.data.media.MediaRepository
+import io.github.beal1031.fin2go.data.media.withDownloads
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -31,9 +36,13 @@ data class LibraryState(
 /** Loads all series or all movies, depending on [type]. */
 class LibraryViewModel(application: Application, private val type: LibraryType) : AndroidViewModel(application) {
     private val media = MediaRepository(application)
+    private val downloads = DownloadRepository(application)
 
     private val _state = MutableStateFlow(LibraryState())
-    val state: StateFlow<LibraryState> = _state.asStateFlow()
+    /** The loaded items, with the downloaded movies marked. */
+    val state: StateFlow<LibraryState> = combine(_state, downloads.downloads.map { it.keys }) { state, downloaded ->
+        state.copy(items = state.items.withDownloads(downloaded))
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _state.value)
 
     init {
         reload()

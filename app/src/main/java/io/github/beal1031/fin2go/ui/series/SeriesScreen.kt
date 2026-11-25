@@ -66,6 +66,7 @@ import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.DetailHeader
 import io.github.beal1031.fin2go.ui.components.PlayButtons
 import io.github.beal1031.fin2go.ui.components.WatchedButton
+import io.github.beal1031.fin2go.ui.components.DownloadedIcon
 import io.github.beal1031.fin2go.ui.components.episodeLabel
 import io.github.beal1031.fin2go.ui.components.runtimeText
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
@@ -452,11 +453,14 @@ private fun EpisodeLine(
             }
         }
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = episodeLabel(episode),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = episodeLabel(episode),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (episode.downloaded) DownloadedIcon()
+            }
             Text(
                 text = episode.title,
                 style = MaterialTheme.typography.titleSmall,
@@ -671,3 +675,11 @@ private fun SeriesNoEpisodesPreview() = SeriesPreview(
 @Preview(name = "7 Error", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun SeriesErrorPreview() = SeriesPreview(SeriesState(loading = false, error = true))
+
+private val downloadedSeries = sampleSeries.copy(
+    episodes = sampleEpisodes.map { it.copy(downloaded = it.id == "e2" || it.id == "e3") },
+)
+
+@Preview(name = "10 Downloaded episodes marked", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun SeriesDownloadedPreview() = SeriesPreview(season(1, downloadedSeries))

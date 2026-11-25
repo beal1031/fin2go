@@ -65,4 +65,6 @@ data class EpisodeDetails(
     val remainingMinutes: Int? = null,
     /** Fully watched. Watched and started again counts as started. */
     val watched: Boolean = false,
+    /** Downloaded to this phone. */
+    val downloaded: Boolean = false,
 )

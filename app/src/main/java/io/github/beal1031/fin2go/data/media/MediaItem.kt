@@ -15,4 +15,10 @@ data class MediaItem(
     val progress: Float? = null,
     /** Fully watched. For a series: all episodes watched. */
     val watched: Boolean = false,
+    /** Downloaded to this phone. Only movies and episodes can be. */
+    val downloaded: Boolean = false,
 )
+
+/** The same items, each marked whether it is in [downloadedIds]. */
+fun List<MediaItem>.withDownloads(downloadedIds: Set<String>): List<MediaItem> =
+    map { it.copy(downloaded = it.id in downloadedIds) }

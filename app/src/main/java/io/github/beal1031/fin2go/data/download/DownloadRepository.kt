@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -81,6 +82,12 @@ class DownloadRepository(context: Context) {
     suspend fun delete(itemId: String) = withContext(Dispatchers.IO) {
         dataStore.edit { prefs -> prefs[downloadsKey] = Json.encodeToString(read(prefs) - itemId) }
         folder(context, itemId).deleteRecursively()
+    }
+
+    /** The downloaded video file of [itemId], or null when it is not (completely) downloaded. */
+    suspend fun localFile(itemId: String): File? {
+        val download = downloads.first()[itemId] ?: return null
+        return File(folder(context, itemId), download.fileName).takeIf { it.exists() }
     }
 
     /** Called by the worker when the file is complete. */

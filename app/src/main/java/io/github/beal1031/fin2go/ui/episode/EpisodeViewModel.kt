@@ -7,6 +7,7 @@ import io.github.beal1031.fin2go.data.download.DownloadRepository
 import io.github.beal1031.fin2go.data.download.DownloadState
 import io.github.beal1031.fin2go.data.media.EpisodePageDetails
 import io.github.beal1031.fin2go.data.media.MediaRepository
+import io.github.beal1031.fin2go.data.playback.ProgressSync
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,6 +48,8 @@ class EpisodeViewModel(application: Application, private val episodeId: String) 
 
     init {
         reload()
+        // Progress watched without internet reached the server later: show it.
+        viewModelScope.launch { ProgressSync(getApplication()).sent.collect { refresh() } }
     }
 
     /** Loads the episode again. On failure, the error with a retry button is shown. */

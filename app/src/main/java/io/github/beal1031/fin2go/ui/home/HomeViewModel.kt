@@ -3,14 +3,20 @@ package io.github.beal1031.fin2go.ui.home
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.beal1031.fin2go.data.download.DownloadRepository
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.data.media.MediaRepository
+import io.github.beal1031.fin2go.data.media.withDownloads
+import io.github.beal1031.fin2go.data.playback.ProgressSync
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -30,12 +36,21 @@ data class HomeState(
 /** Loads the three rows of the home screen. */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val media = MediaRepository(application)
+    private val downloads = DownloadRepository(application)
 
     private val _state = MutableStateFlow(HomeState())
-    val state: StateFlow<HomeState> = _state.asStateFlow()
+    /** The loaded rows, with the downloaded movies and episodes marked. */
+    val state: StateFlow<HomeState> = combine(_state, downloads.downloads.map { it.keys }) { state, downloaded ->
+        state.copy(
+            continueWatching = state.continueWatching.withDownloads(downloaded),
+            latestMovies = state.latestMovies.withDownloads(downloaded),
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, _state.value)
 
     init {
         reload()
+        // Progress watched without internet reached the server later: show it.
+        viewModelScope.launch { ProgressSync(getApplication()).sent.collect { refresh() } }
     }
 
 

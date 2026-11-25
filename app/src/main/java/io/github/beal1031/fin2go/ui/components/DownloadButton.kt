@@ -205,3 +205,14 @@ private fun DownloadButtonCancelPreview() =
 @Preview(name = "3d Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE, locale = "lb")
 @Composable
 private fun DownloadButtonDeletePreview() = DownloadButtonPreview(listOf(DownloadState.Downloaded), confirming = true)
+
+/** Small "downloaded" sign next to a text, e.g. after "S1:E3" in lists. */
+@Composable
+fun DownloadedIcon(modifier: Modifier = Modifier) {
+    Icon(
+        painter = painterResource(R.drawable.ic_download_done),
+        contentDescription = stringResource(R.string.download_done),
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = modifier.size(16.dp),
+    )
+}
