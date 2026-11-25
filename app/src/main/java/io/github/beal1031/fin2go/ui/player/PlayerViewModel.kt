@@ -67,7 +67,17 @@ data class PlayerState(
     val audioIndex: Int? = null,
     /** The chosen subtitles, by the server's number; null for none. */
     val subtitleIndex: Int? = null,
+    /** Seconds until the next episode starts, while the card shows; null when it does not show. */
+    val nextInSeconds: Int? = null,
+    /** The user cancelled the card for this episode. */
+    val nextDismissed: Boolean = false,
 )
+
+/** The card starts counting down from 10 seconds. */
+private const val NEXT_COUNTDOWN_MS = 10_000L
+
+/** Without known credits, the card shows 30 seconds before the end. */
+private const val CARD_BEFORE_END_MS = 30_000L
 
 /**
  * How big the video may be. [maxBitrate] is the most the server may send, in bits per second;
@@ -120,6 +130,12 @@ class PlayerViewModel(
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            val current = _state.value
+            // At the end of an episode with a next one, that one starts, unless the user cancelled the card.
+            if (playbackState == Player.STATE_ENDED && current.info?.nextEpisodeId != null && !current.nextDismissed) {
+                goToEpisode(forward = true)
+                return
+            }
             _state.update {
                 it.copy(buffering = playbackState == Player.STATE_BUFFERING, ended = playbackState == Player.STATE_ENDED)
             }
@@ -217,6 +233,8 @@ class PlayerViewModel(
         stream = null
         itemId = target
         fromStart = true
+        nextInMs = NEXT_COUNTDOWN_MS
+        // Clearing info also keeps a second call, e.g. from the countdown and the end at once, from going on.
         _state.update { PlayerState(speed = it.speed, quality = it.quality) }
         viewModelScope.launch {
             try {
@@ -413,8 +431,45 @@ class PlayerViewModel(
                     ticks = 0
                     reportProgress()
                 }
+                countDownToNext()
             }
         }
+    }
+
+    /** Milliseconds until the next episode starts by itself, while the card shows. */
+    private var nextInMs = NEXT_COUNTDOWN_MS
+
+    /**
+     * Shows the card "Next episode in 10 s" from the start of the credits on (or 30 seconds before the end)
+     * and counts down while the video plays. At 0 the next episode starts. Jumping back before that point
+     * hides the card again and starts the countdown anew.
+     */
+    private fun countDownToNext() {
+        val current = _state.value
+        val info = current.info
+        val duration = current.durationMs
+        if (info?.nextEpisodeId == null || current.nextDismissed || duration <= 0L) return
+        val from = info.creditsStartMs ?: (duration - CARD_BEFORE_END_MS)
+        if (current.positionMs < from) {
+            nextInMs = NEXT_COUNTDOWN_MS
+            if (current.nextInSeconds != null) _state.update { it.copy(nextInSeconds = null) }
+            return
+        }
+        if (player.isPlaying) nextInMs -= 500L
+        if (nextInMs <= 0L) {
+            goToEpisode(forward = true)
+            return
+        }
+        // Rounded up, so it counts 10, 9, … 1 and never shows 0.
+        _state.update { it.copy(nextInSeconds = ((nextInMs + 999L) / 1000L).toInt()) }
+    }
+
+    /** "Play now" on the card. */
+    fun playNextNow() = goToEpisode(forward = true)
+
+    /** "Cancel" on the card: it does not come back for this episode, and at the end the player closes. */
+    fun dismissNext() {
+        _state.update { it.copy(nextDismissed = true, nextInSeconds = null) }
     }
 
     private fun reportProgress() {

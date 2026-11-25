@@ -83,4 +83,7 @@
     <string name="player_subtitles_off">Aus</string>
     <string name="player_previous_episode">Vorige Folge</string>
     <string name="player_next_episode">Nächste Folge</string>
+    <!-- Card at the end of an episode, e.g. Next episode in 7 s -->
+    <string name="player_next_in">Nächste Folge in %1$d s</string>
+    <string name="player_play_now">Jetzt abspielen</string>
 </resources>

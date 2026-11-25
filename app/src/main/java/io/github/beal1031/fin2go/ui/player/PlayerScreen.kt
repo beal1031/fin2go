@@ -49,6 +49,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -185,6 +186,8 @@ fun PlayerScreen(
             interactions++
             viewModel.goToEpisode(forward)
         },
+        onPlayNext = viewModel::playNextNow,
+        onCancelNext = viewModel::dismissNext,
         onPlayPause = {
             interactions++
             viewModel.playPause()
@@ -248,6 +251,8 @@ fun PlayerContent(
     onDoubleTap: (leftHalf: Boolean) -> Unit,
     onSkip: (forward: Boolean) -> Unit,
     onEpisode: (forward: Boolean) -> Unit,
+    onPlayNext: () -> Unit,
+    onCancelNext: () -> Unit,
     onPlayPause: () -> Unit,
     onSeeking: () -> Unit,
     onSeek: (Long) -> Unit,
@@ -356,6 +361,19 @@ fun PlayerContent(
                 modifier = Modifier
                     .align(if (it.forward) Alignment.CenterEnd else Alignment.CenterStart)
                     .padding(horizontal = 96.dp),
+            )
+        }
+
+        // Bottom right, above the timeline, also with the controls hidden.
+        state.nextInSeconds?.let {
+            NextEpisodeCard(
+                seconds = it,
+                onPlayNow = onPlayNext,
+                onCancel = onCancelNext,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(end = 16.dp, bottom = 72.dp),
             )
         }
 
@@ -494,6 +512,24 @@ private fun ChoiceRow(text: String, selected: Boolean, onClick: () -> Unit) {
 private fun speedText(speed: Float): String {
     val locale = LocalConfiguration.current.locales[0]
     return NumberFormat.getNumberInstance(locale).format(speed.toDouble()) + "×"
+}
+
+/** "Next episode in 10 s", with buttons to start it at once or to stay. */
+@Composable
+private fun NextEpisodeCard(seconds: Int, onPlayNow: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = stringResource(R.string.player_next_in, seconds), style = MaterialTheme.typography.titleMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = onCancel) { Text(stringResource(R.string.cancel)) }
+                Button(onClick = onPlayNow) { Text(stringResource(R.string.player_play_now)) }
+            }
+        }
+    }
 }
 
 /** To the previous or the next episode. When not [visible], only its empty place is kept. */
@@ -791,6 +827,8 @@ private fun PlayerPreview(
                     onDoubleTap = {},
                     onSkip = {},
                     onEpisode = {},
+                    onPlayNext = {},
+                    onCancelNext = {},
                     onPlayPause = {},
                     onSeeking = {},
                     onSeek = {},
@@ -939,6 +977,28 @@ private fun PlayerLastEpisodePreview() = PlayerPreview(
     playingState.copy(info = episodeInfo.copy(episodeNumber = 3, episodeTitle = "Llamigos", nextEpisodeId = null)),
     picture = PreviewImage.EPISODE_CAMINANDES_3,
 )
+
+private val creditsState = playingState.copy(
+    info = episodeInfo,
+    positionMs = 11 * 60_000L + 50_000L,
+    durationMs = 12 * 60_000L + 14_000L,
+    nextInSeconds = 7,
+)
+
+@Preview(name = "2e4 Credits: next episode in 7 s", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerNextCardPreview() =
+    PlayerPreview(creditsState, controlsVisible = false, picture = PreviewImage.EPISODE_CAMINANDES_2)
+
+@Preview(name = "2e5 Credits, controls shown", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
+@Composable
+private fun PlayerNextCardControlsPreview() = PlayerPreview(creditsState, picture = PreviewImage.EPISODE_CAMINANDES_2)
+
+@Preview(name = "2e6 German", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "de")
+@Preview(name = "2e7 French", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "fr")
+@Preview(name = "2e8 Luxembourgish", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE, locale = "lb")
+@Composable
+private fun PlayerNextCardLanguagesPreview() = PlayerNextCardPreview()
 
 @Preview(name = "2f Special with a long title", showSystemUi = true, device = PREVIEW_PHONE_LANDSCAPE)
 @Composable

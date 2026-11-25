@@ -85,4 +85,7 @@
     <string name="player_subtitles_off">Aus</string>
     <string name="player_previous_episode">Vireg Episod</string>
     <string name="player_next_episode">Nächst Episod</string>
+    <!-- Card at the end of an episode, e.g. Next episode in 7 s -->
+    <string name="player_next_in">Nächst Episod an %1$d s</string>
+    <string name="player_play_now">Elo ofspillen</string>
 </resources>

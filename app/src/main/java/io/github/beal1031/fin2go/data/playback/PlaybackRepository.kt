@@ -8,12 +8,14 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.jellyfin.sdk.api.client.extensions.libraryApi
 import org.jellyfin.sdk.api.client.extensions.mediaInfoApi
+import org.jellyfin.sdk.api.client.extensions.mediaSegmentApi
 import org.jellyfin.sdk.api.client.extensions.sessionApi
 import org.jellyfin.sdk.api.client.extensions.showApi
 import org.jellyfin.sdk.api.client.extensions.videoApi
 import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import androidx.media3.common.MimeTypes
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.jellyfin.sdk.model.api.MediaSegmentType
 import org.jellyfin.sdk.model.api.MediaStreamType
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
 import org.jellyfin.sdk.model.api.PlayMethod
@@ -36,6 +38,8 @@ data class PlaybackInfo(
     /** The episodes before and after this one; null at the first or last episode, and for movies. */
     val previousEpisodeId: String? = null,
     val nextEpisodeId: String? = null,
+    /** Where the credits begin, when the server knows it (needs a plugin that finds them, e.g. Intro Skipper). */
+    val creditsStartMs: Long? = null,
 )
 
 /** Where the video comes from and how the server delivers it. Needed again for every report. */
@@ -112,11 +116,20 @@ class PlaybackRepository(context: Context) {
                 episodeTitle = if (isEpisode) item.name?.takeIf { it.isNotBlank() } else null,
                 previousEpisodeId = previous,
                 nextEpisodeId = next,
+                // Only needed when there is a next episode to show.
+                creditsStartMs = if (next != null) creditsStart(item.id) else null,
             ),
             stream = stream,
             startPositionMs = if (fromStart) 0L else ticksToMs(item.userData?.playbackPositionTicks ?: 0L),
         )
     }
+
+    /** Where the credits of the item begin; null when the server does not know it or cannot tell. */
+    private suspend fun creditsStart(itemId: UUID): Long? = runCatching {
+        api.mediaSegmentApi.getItemSegments(itemId, listOf(MediaSegmentType.OUTRO)).content.items
+            .minOfOrNull { it.startTicks }
+            ?.let(::ticksToMs)
+    }.getOrNull()
 
     /**
      * The episodes before and after [episodeId], over all seasons. The specials (season 0) are left out;
