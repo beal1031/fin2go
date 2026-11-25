@@ -32,6 +32,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
+import io.github.beal1031.fin2go.data.download.DownloadState
 import io.github.beal1031.fin2go.data.media.MovieDetails
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
 import io.github.beal1031.fin2go.ui.PreviewImage
@@ -40,6 +41,7 @@ import io.github.beal1031.fin2go.ui.withoutTop
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.DetailHeader
+import io.github.beal1031.fin2go.ui.components.DownloadButton
 import io.github.beal1031.fin2go.ui.components.PlayButtons
 import io.github.beal1031.fin2go.ui.components.runtimeText
 import io.github.beal1031.fin2go.ui.theme.Fin2goTheme
@@ -55,6 +57,7 @@ fun MovieScreen(
     viewModel: MovieViewModel = viewModel { MovieViewModel(checkNotNull(this[APPLICATION_KEY]), movieId) },
 ) {
     val state by viewModel.state.collectAsState()
+    val download by viewModel.download.collectAsState()
     // Each time the page is shown again, e.g. back from the player: load the current progress.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
     // Kept when the phone is rotated.
@@ -68,6 +71,10 @@ fun MovieScreen(
         onPlay = { onPlay(movieId, false) },
         onStartOver = { onPlay(movieId, true) },
         onToggleWatched = viewModel::toggleWatched,
+        download = download,
+        onDownload = viewModel::startDownload,
+        onCancelDownload = viewModel::cancelDownload,
+        onDeleteDownload = viewModel::deleteDownload,
         statusBarHeight = statusBarHeight,
         modifier = modifier,
     )
@@ -86,6 +93,10 @@ fun MovieContent(
     onPlay: () -> Unit,
     onStartOver: () -> Unit,
     onToggleWatched: () -> Unit,
+    download: DownloadState,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDeleteDownload: () -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -105,6 +116,10 @@ fun MovieContent(
                 onPlay,
                 onStartOver,
                 onToggleWatched,
+                download,
+                onDownload,
+                onCancelDownload,
+                onDeleteDownload,
                 statusBarHeight,
             )
         }
@@ -120,6 +135,10 @@ private fun MovieDetailsView(
     onPlay: () -> Unit,
     onStartOver: () -> Unit,
     onToggleWatched: () -> Unit,
+    download: DownloadState,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDeleteDownload: () -> Unit,
     statusBarHeight: Dp,
 ) {
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -160,6 +179,15 @@ private fun MovieDetailsView(
                 onStartOver = onStartOver,
                 onToggleWatched = onToggleWatched,
                 modifier = Modifier.padding(top = 8.dp),
+                downloadButton = {
+                    DownloadButton(
+                        state = download,
+                        name = movie.title,
+                        onDownload = onDownload,
+                        onCancel = onCancelDownload,
+                        onDelete = onDeleteDownload,
+                    )
+                },
             )
             movie.overview?.let { overview ->
                 Text(
@@ -195,7 +223,11 @@ private val sampleMovie = MovieDetails(
 )
 
 @Composable
-private fun MoviePreview(state: MovieState, overviewExpanded: Boolean = false) {
+private fun MoviePreview(
+    state: MovieState,
+    overviewExpanded: Boolean = false,
+    download: DownloadState = DownloadState.NotDownloaded,
+) {
     Fin2goTheme {
         WithPreviewImages {
             // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
@@ -212,6 +244,10 @@ private fun MoviePreview(state: MovieState, overviewExpanded: Boolean = false) {
                         onPlay = {},
                         onStartOver = {},
                         onToggleWatched = {},
+                        download = download,
+                        onDownload = {},
+                        onCancelDownload = {},
+                        onDeleteDownload = {},
                         statusBarHeight = statusBarHeight,
                     )
                     AppTopBar(
@@ -315,3 +351,13 @@ private fun MovieWatchedLanguagesPreview() = MoviePreview(MovieState(loading = f
 @Preview(name = "3 Error", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun MovieErrorPreview() = MoviePreview(MovieState(loading = false, error = true))
+
+@Preview(name = "6 Downloading", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MovieDownloadingPreview() =
+    MoviePreview(MovieState(loading = false, movie = sampleMovie), download = DownloadState.Downloading(0.42f))
+
+@Preview(name = "6b Downloaded", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun MovieDownloadedPreview() =
+    MoviePreview(MovieState(loading = false, movie = sampleMovie), download = DownloadState.Downloaded)

@@ -88,4 +88,20 @@
     <!-- Card at the end of an episode, e.g. Next episode in 7 s -->
     <string name="player_next_in">Nächst Episod an %1$d s</string>
     <string name="player_play_now">Elo ofspillen</string>
+
+    <!-- Download button on the movie and episode page (drafts, to be checked) -->
+    <string name="download_start">Eroflueden</string>
+    <string name="download_waiting">Download waart op WLAN</string>
+    <string name="download_running">Gëtt erofgelueden, %1$d %%</string>
+    <string name="download_done">Erofgelueden</string>
+    <string name="download_cancel_title">Download ofbriechen?</string>
+    <string name="download_cancel_text">Deen Deel, deen schonn erofgelueden ass, gëtt geläscht.</string>
+    <string name="download_cancel_confirm">Download ofbriechen</string>
+    <string name="download_cancel_keep">Weiderlueden</string>
+    <string name="download_delete_title">Download läschen?</string>
+    <string name="download_delete_text">%1$s gëtt vun dësem Handy geläscht. Du kanns et all Moment nees eroflueden.</string>
+    <string name="download_delete_confirm">Läschen</string>
+    <!-- Notification while downloading -->
+    <string name="download_notification_channel">Downloads</string>
+    <string name="download_notification_text">Gëtt erofgelueden</string>
 </resources>

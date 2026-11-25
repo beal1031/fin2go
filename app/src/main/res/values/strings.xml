@@ -102,4 +102,22 @@
     <!-- Card at the end of an episode, e.g. Next episode in 7 s -->
     <string name="player_next_in">Next episode in %1$d s</string>
     <string name="player_play_now">Play now</string>
+
+    <!-- Download button on the movie and episode page; the texts are read out by screen readers -->
+    <string name="download_start">Download</string>
+    <string name="download_waiting">Download waiting for Wi-Fi</string>
+    <!-- e.g. Downloading, 42 % -->
+    <string name="download_running">Downloading, %1$d %%</string>
+    <string name="download_done">Downloaded</string>
+    <string name="download_cancel_title">Cancel download?</string>
+    <string name="download_cancel_text">The part loaded so far will be removed.</string>
+    <string name="download_cancel_confirm">Cancel download</string>
+    <string name="download_cancel_keep">Keep loading</string>
+    <string name="download_delete_title">Delete download?</string>
+    <!-- %1$s is the title of the movie or episode -->
+    <string name="download_delete_text">%1$s will be removed from this phone. You can download it again at any time.</string>
+    <string name="download_delete_confirm">Delete</string>
+    <!-- Notification while downloading -->
+    <string name="download_notification_channel">Downloads</string>
+    <string name="download_notification_text">Downloading</string>
 </resources>

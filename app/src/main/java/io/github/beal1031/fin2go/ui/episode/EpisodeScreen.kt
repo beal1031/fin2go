@@ -32,6 +32,7 @@ import androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.Companion.AP
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.beal1031.fin2go.R
+import io.github.beal1031.fin2go.data.download.DownloadState
 import io.github.beal1031.fin2go.data.media.EpisodeDetails
 import io.github.beal1031.fin2go.data.media.EpisodePageDetails
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
@@ -40,6 +41,7 @@ import io.github.beal1031.fin2go.ui.WithPreviewImages
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.DetailHeader
+import io.github.beal1031.fin2go.ui.components.DownloadButton
 import io.github.beal1031.fin2go.ui.components.PlayButtons
 import io.github.beal1031.fin2go.ui.components.episodeLabel
 import io.github.beal1031.fin2go.ui.components.runtimeText
@@ -57,6 +59,7 @@ fun EpisodeScreen(
     viewModel: EpisodeViewModel = viewModel { EpisodeViewModel(checkNotNull(this[APPLICATION_KEY]), episodeId) },
 ) {
     val state by viewModel.state.collectAsState()
+    val download by viewModel.download.collectAsState()
     // Each time the page is shown again, e.g. back from the player: load the current progress.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
     // Kept when the phone is rotated.
@@ -70,6 +73,10 @@ fun EpisodeScreen(
         onPlay = { onPlay(episodeId, false) },
         onStartOver = { onPlay(episodeId, true) },
         onToggleWatched = viewModel::toggleWatched,
+        download = download,
+        onDownload = viewModel::startDownload,
+        onCancelDownload = viewModel::cancelDownload,
+        onDeleteDownload = viewModel::deleteDownload,
         statusBarHeight = statusBarHeight,
         modifier = modifier,
     )
@@ -88,6 +95,10 @@ fun EpisodeContent(
     onPlay: () -> Unit,
     onStartOver: () -> Unit,
     onToggleWatched: () -> Unit,
+    download: DownloadState,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDeleteDownload: () -> Unit,
     statusBarHeight: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -107,6 +118,10 @@ fun EpisodeContent(
                 onPlay,
                 onStartOver,
                 onToggleWatched,
+                download,
+                onDownload,
+                onCancelDownload,
+                onDeleteDownload,
                 statusBarHeight,
             )
         }
@@ -125,6 +140,10 @@ private fun EpisodeDetailsView(
     onPlay: () -> Unit,
     onStartOver: () -> Unit,
     onToggleWatched: () -> Unit,
+    download: DownloadState,
+    onDownload: () -> Unit,
+    onCancelDownload: () -> Unit,
+    onDeleteDownload: () -> Unit,
     statusBarHeight: Dp,
 ) {
     val episode = details.episode
@@ -166,6 +185,15 @@ private fun EpisodeDetailsView(
                 onStartOver = onStartOver,
                 onToggleWatched = onToggleWatched,
                 modifier = Modifier.padding(top = 8.dp),
+                downloadButton = {
+                    DownloadButton(
+                        state = download,
+                        name = episode.title,
+                        onDownload = onDownload,
+                        onCancel = onCancelDownload,
+                        onDelete = onDeleteDownload,
+                    )
+                },
             )
             episode.overview?.let { overview ->
                 Text(
@@ -203,7 +231,11 @@ private val sampleDetails = EpisodePageDetails(
 )
 
 @Composable
-private fun EpisodePreview(state: EpisodeState, overviewExpanded: Boolean = false) {
+private fun EpisodePreview(
+    state: EpisodeState,
+    overviewExpanded: Boolean = false,
+    download: DownloadState = DownloadState.NotDownloaded,
+) {
     Fin2goTheme {
         WithPreviewImages {
             // Same Scaffold as in MainActivity, so status bar and camera cutout are respected.
@@ -220,6 +252,10 @@ private fun EpisodePreview(state: EpisodeState, overviewExpanded: Boolean = fals
                         onPlay = {},
                         onStartOver = {},
                         onToggleWatched = {},
+                        download = download,
+                        onDownload = {},
+                        onCancelDownload = {},
+                        onDeleteDownload = {},
                         statusBarHeight = statusBarHeight,
                     )
                     AppTopBar(
@@ -287,3 +323,12 @@ private fun EpisodeWatchedPreview() = EpisodePreview(loaded(watchedDetails))
 @Preview(name = "3 Error", showSystemUi = true, device = PREVIEW_PHONE)
 @Composable
 private fun EpisodeErrorPreview() = EpisodePreview(EpisodeState(loading = false, error = true))
+
+@Preview(name = "6 Downloading", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun EpisodeDownloadingPreview() =
+    EpisodePreview(loaded(sampleDetails), download = DownloadState.Downloading(0.42f))
+
+@Preview(name = "6b Downloaded", showSystemUi = true, device = PREVIEW_PHONE)
+@Composable
+private fun EpisodeDownloadedPreview() = EpisodePreview(loaded(sampleDetails), download = DownloadState.Downloaded)

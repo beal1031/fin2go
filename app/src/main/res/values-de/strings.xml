@@ -86,4 +86,20 @@
     <!-- Card at the end of an episode, e.g. Next episode in 7 s -->
     <string name="player_next_in">Nächste Folge in %1$d s</string>
     <string name="player_play_now">Jetzt abspielen</string>
+
+    <!-- Download button on the movie and episode page -->
+    <string name="download_start">Herunterladen</string>
+    <string name="download_waiting">Download wartet auf WLAN</string>
+    <string name="download_running">Wird geladen, %1$d %%</string>
+    <string name="download_done">Heruntergeladen</string>
+    <string name="download_cancel_title">Download abbrechen?</string>
+    <string name="download_cancel_text">Der bisher geladene Teil wird gelöscht.</string>
+    <string name="download_cancel_confirm">Download abbrechen</string>
+    <string name="download_cancel_keep">Weiterladen</string>
+    <string name="download_delete_title">Download löschen?</string>
+    <string name="download_delete_text">%1$s wird von diesem Handy gelöscht. Du kannst es jederzeit wieder herunterladen.</string>
+    <string name="download_delete_confirm">Löschen</string>
+    <!-- Notification while downloading -->
+    <string name="download_notification_channel">Downloads</string>
+    <string name="download_notification_text">Wird heruntergeladen</string>
 </resources>

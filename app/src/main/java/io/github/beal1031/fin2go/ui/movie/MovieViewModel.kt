@@ -3,12 +3,16 @@ package io.github.beal1031.fin2go.ui.movie
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.github.beal1031.fin2go.data.download.DownloadRepository
+import io.github.beal1031.fin2go.data.download.DownloadState
 import io.github.beal1031.fin2go.data.media.MediaRepository
 import io.github.beal1031.fin2go.data.media.MovieDetails
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -22,9 +26,24 @@ data class MovieState(
 /** Loads the details of the movie with [movieId]. */
 class MovieViewModel(application: Application, private val movieId: String) : AndroidViewModel(application) {
     private val media = MediaRepository(application)
+    private val downloads = DownloadRepository(application)
 
     private val _state = MutableStateFlow(MovieState())
     val state: StateFlow<MovieState> = _state.asStateFlow()
+
+    /** How far the download of the movie is, updated while it runs. */
+    val download: StateFlow<DownloadState> = downloads.state(movieId)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DownloadState.NotDownloaded)
+
+    fun startDownload() = downloads.start(movieId)
+
+    fun cancelDownload() {
+        viewModelScope.launch { downloads.cancel(movieId) }
+    }
+
+    fun deleteDownload() {
+        viewModelScope.launch { downloads.delete(movieId) }
+    }
 
     init {
         reload()

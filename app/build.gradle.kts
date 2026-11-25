@@ -63,6 +63,7 @@ dependencies {
     implementation(libs.media3.exoplayer.hls)
     implementation(libs.media3.ui.compose)
     implementation(libs.jellyfin.media3.ffmpeg)
+    implementation(libs.androidx.work.runtime.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

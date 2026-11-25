@@ -94,7 +94,8 @@ fun DetailHeader(backdropUrl: String?, posterUrl: String?, statusBarHeight: Dp) 
  * Depends on how far the movie or episode was watched ([progress] null: not started or fully watched):
  * not started: "Play"; started: progress bar with the time left, "Resume" and "Start over"; watched: "Play again".
  * [canResume] shows "Resume" and "Start over" also without a bar; the series page uses it when the next episode
- * is not started yet. On the right the round watched button, unless [onToggleWatched] is null.
+ * is not started yet. On the right the round watched button, unless [onToggleWatched] is null,
+ * and before it [downloadButton], when given.
  */
 @Composable
 fun PlayButtons(
@@ -106,6 +107,7 @@ fun PlayButtons(
     onToggleWatched: (() -> Unit)?,
     modifier: Modifier = Modifier,
     canResume: Boolean = progress != null,
+    downloadButton: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (progress != null) {
@@ -148,6 +150,7 @@ fun PlayButtons(
                     PlayButtonContent(if (watched) R.string.movie_play_again else R.string.movie_play)
                 }
             }
+            downloadButton?.invoke()
             onToggleWatched?.let { WatchedButton(watched = watched, onClick = it) }
         }
     }
