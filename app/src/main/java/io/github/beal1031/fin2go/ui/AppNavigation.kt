@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -32,6 +33,7 @@ import androidx.navigation.toRoute
 import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.AppTopBarHeight
+import io.github.beal1031.fin2go.ui.components.LocalServerReachable
 import io.github.beal1031.fin2go.ui.episode.EpisodeScreen
 import io.github.beal1031.fin2go.ui.home.HomeScreen
 import io.github.beal1031.fin2go.ui.library.LibraryScreen
@@ -141,51 +143,54 @@ fun AppNavigation(
         val exit = { scope: AnimatedContentTransitionScope<NavBackStackEntry> ->
             if (scope.involvesPlayer()) ExitTransition.None else fadeOut(tween(700))
         }
-        NavHost(
-            navController = navController,
-            startDestination = HomeRoute,
-            enterTransition = { enter(this) },
-            exitTransition = { exit(this) },
-            popEnterTransition = { enter(this) },
-            popExitTransition = { exit(this) },
-        ) {
-            composable<HomeRoute> {
-                HomeScreen(
-                    onShowAllSeries = { open(LibraryRoute(LibraryType.SERIES)) },
-                    onShowAllMovies = { open(LibraryRoute(LibraryType.MOVIES)) },
-                    onOpenMovie = openMovie,
-                    onOpenSeries = openSeries,
-                    onPlay = { play(it.id, false) },
-                    modifier = belowBar,
-                )
-            }
-            composable<LibraryRoute> { entry ->
-                LibraryScreen(
-                    type = entry.toRoute<LibraryRoute>().type,
-                    onOpenMovie = openMovie,
-                    onOpenSeries = openSeries,
-                    modifier = belowBar,
-                )
-            }
-            composable<MovieRoute> { entry ->
-                MovieScreen(movieId = entry.toRoute<MovieRoute>().id, onPlay = play, statusBarHeight = statusBarHeight)
-            }
-            composable<SeriesRoute> { entry ->
-                val route = entry.toRoute<SeriesRoute>()
-                SeriesScreen(
-                    seriesId = route.id,
-                    episodeId = route.episodeId,
-                    onOpenEpisode = { open(EpisodeRoute(it.id)) },
-                    onPlay = { play(it.id, false) },
-                    statusBarHeight = statusBarHeight,
-                )
-            }
-            composable<EpisodeRoute> { entry ->
-                EpisodeScreen(episodeId = entry.toRoute<EpisodeRoute>().id, onPlay = play, statusBarHeight = statusBarHeight)
-            }
-            composable<PlayerRoute> { entry ->
-                val route = entry.toRoute<PlayerRoute>()
-                PlayerScreen(itemId = route.id, fromStart = route.fromStart, onClose = { back(entry) })
+        // All pages can see whether the server is reachable, see OnConnectionChange.
+        CompositionLocalProvider(LocalServerReachable provides !offline) {
+            NavHost(
+                navController = navController,
+                startDestination = HomeRoute,
+                enterTransition = { enter(this) },
+                exitTransition = { exit(this) },
+                popEnterTransition = { enter(this) },
+                popExitTransition = { exit(this) },
+            ) {
+                composable<HomeRoute> {
+                    HomeScreen(
+                        onShowAllSeries = { open(LibraryRoute(LibraryType.SERIES)) },
+                        onShowAllMovies = { open(LibraryRoute(LibraryType.MOVIES)) },
+                        onOpenMovie = openMovie,
+                        onOpenSeries = openSeries,
+                        onPlay = { play(it.id, false) },
+                        modifier = belowBar,
+                    )
+                }
+                composable<LibraryRoute> { entry ->
+                    LibraryScreen(
+                        type = entry.toRoute<LibraryRoute>().type,
+                        onOpenMovie = openMovie,
+                        onOpenSeries = openSeries,
+                        modifier = belowBar,
+                    )
+                }
+                composable<MovieRoute> { entry ->
+                    MovieScreen(movieId = entry.toRoute<MovieRoute>().id, onPlay = play, statusBarHeight = statusBarHeight)
+                }
+                composable<SeriesRoute> { entry ->
+                    val route = entry.toRoute<SeriesRoute>()
+                    SeriesScreen(
+                        seriesId = route.id,
+                        episodeId = route.episodeId,
+                        onOpenEpisode = { open(EpisodeRoute(it.id)) },
+                        onPlay = { play(it.id, false) },
+                        statusBarHeight = statusBarHeight,
+                    )
+                }
+                composable<EpisodeRoute> { entry ->
+                    EpisodeScreen(episodeId = entry.toRoute<EpisodeRoute>().id, onPlay = play, statusBarHeight = statusBarHeight)
+                }
+                composable<PlayerRoute> { entry ->
+                    val route = entry.toRoute<PlayerRoute>()
+                    PlayerScreen(itemId = route.id, fromStart = route.fromStart, onClose = { back(entry) })
+                }
             }
         }
 

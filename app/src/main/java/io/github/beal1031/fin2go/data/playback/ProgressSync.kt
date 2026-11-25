@@ -101,6 +101,9 @@ class ProgressSync(context: Context) {
         }
     }
 
+    /** The positions not sent yet, by item id: the newest progress on this phone, e.g. while offline. */
+    suspend fun pending(): Map<String, PendingProgress> = read(dataStore.data.first())
+
     /** Sends every kept position. Each one that reached the server, or was older than the server's, is removed. */
     internal suspend fun sendAll() {
         val account = AccountStore(context).account.first() ?: return

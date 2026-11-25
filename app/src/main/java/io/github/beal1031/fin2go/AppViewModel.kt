@@ -8,6 +8,7 @@ import io.github.beal1031.fin2go.data.ServerStatus
 import io.github.beal1031.fin2go.data.account.Account
 import io.github.beal1031.fin2go.data.account.AccountStore
 import io.github.beal1031.fin2go.data.download.DownloadRepository
+import io.github.beal1031.fin2go.data.media.OfflineLibrary
 import io.github.beal1031.fin2go.data.media.MediaRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,7 +45,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         // At each start: fetch series info that older downloads are still missing. Offline it fails quietly
         // and is tried again at the next start.
-        viewModelScope.launch { DownloadRepository(application).fillMissingSeries() }
+        viewModelScope.launch {
+            DownloadRepository(application).fillMissingSeries()
+            // The newest watched state of the downloads, for the case the phone goes offline.
+            runCatching { OfflineLibrary(application).refreshFromServer() }
+        }
     }
 
     val state: StateFlow<AppState> = accountStore.account

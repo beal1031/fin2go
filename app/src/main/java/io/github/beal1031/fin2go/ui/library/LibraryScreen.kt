@@ -33,6 +33,7 @@ import io.github.beal1031.fin2go.data.media.MediaItem
 import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
 import io.github.beal1031.fin2go.ui.PreviewImage
 import io.github.beal1031.fin2go.ui.WithPreviewImages
+import io.github.beal1031.fin2go.ui.components.OnConnectionChange
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.MediaTile
@@ -51,6 +52,8 @@ fun LibraryScreen(
     val state by viewModel.state.collectAsState()
     // Each time the screen is shown again, e.g. back from a movie or back in the app: load the current state.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
+    // Offline the page shows the downloads, online again what the server has.
+    OnConnectionChange { viewModel.onShown() }
 
     LibraryContent(
         type = type,

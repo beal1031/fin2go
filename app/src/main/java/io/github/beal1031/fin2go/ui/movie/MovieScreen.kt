@@ -38,6 +38,7 @@ import io.github.beal1031.fin2go.ui.PREVIEW_PHONE
 import io.github.beal1031.fin2go.ui.PreviewImage
 import io.github.beal1031.fin2go.ui.WithPreviewImages
 import io.github.beal1031.fin2go.ui.withoutTop
+import io.github.beal1031.fin2go.ui.components.OnConnectionChange
 import io.github.beal1031.fin2go.ui.components.AppTopBar
 import io.github.beal1031.fin2go.ui.components.CenteredBox
 import io.github.beal1031.fin2go.ui.components.DetailHeader
@@ -60,6 +61,8 @@ fun MovieScreen(
     val download by viewModel.download.collectAsState()
     // Each time the page is shown again, e.g. back from the player: load the current progress.
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onShown() }
+    // Offline the page shows the downloads, online again what the server has.
+    OnConnectionChange { viewModel.onShown() }
     // Kept when the phone is rotated.
     var overviewExpanded by rememberSaveable { mutableStateOf(false) }
 
