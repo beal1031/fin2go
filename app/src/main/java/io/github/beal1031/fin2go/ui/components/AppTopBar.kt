@@ -55,7 +55,7 @@ val AppTopBarHeight = 56.dp
  * It has no background, so a picture behind it stays visible.
  * Without [onBack], "Fin2Go" is shown. With [onBack], a back arrow comes first, followed by [title] if given.
  * With [onPicture], the back arrow gets a dark round background, so it stays visible on a bright picture behind the bar.
- * With [offline], a crossed-out cloud left of the profile picture shows that the server cannot be reached.
+ * With [offline], a crossed-out cloud in the middle of the bar shows that the server cannot be reached.
  */
 @Composable
 fun AppTopBar(
@@ -68,69 +68,70 @@ fun AppTopBar(
     onPicture: Boolean = false,
     offline: Boolean = false,
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(AppTopBarHeight)
-            // The arrow button has 8dp space around the icon, so the icon starts where "Fin2Go" starts.
-            .padding(start = if (onBack != null) 8.dp else 16.dp, end = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (onBack != null) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(40.dp),
-                colors = if (onPicture) {
-                    IconButtonDefaults.iconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.45f),
-                        contentColor = Color.White,
-                    )
-                } else {
-                    IconButtonDefaults.iconButtonColors()
-                },
-            ) {
-                Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+    Box(modifier = modifier.fillMaxWidth().height(AppTopBarHeight)) {
+        Row(
+            modifier = Modifier
+                .matchParentSize()
+                // The arrow button has 8dp space around the icon, so the icon starts where "Fin2Go" starts.
+                .padding(start = if (onBack != null) 8.dp else 16.dp, end = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onBack != null) {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(40.dp),
+                    colors = if (onPicture) {
+                        IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.45f),
+                            contentColor = Color.White,
+                        )
+                    } else {
+                        IconButtonDefaults.iconButtonColors()
+                    },
+                ) {
+                    Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+                }
+            }
+            val text = title ?: if (onBack == null) stringResource(R.string.app_name) else null
+            if (text != null) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.titleLarge,
+                    // A long title is cut off with "…", so the bar keeps its height.
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
+
+            // Only the UI needs to know whether the menu is open, so it is kept here and not in a ViewModel.
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                ProfileImage(
+                    userName = userName,
+                    imageUrl = profileImageUrl,
+                    // indication = null: no ripple animation on tap.
+                    modifier = Modifier.clickable(interactionSource = null, indication = null) { menuOpen = true },
+                )
+                DropdownMenu(
+                    expanded = menuOpen,
+                    onDismissRequest = { menuOpen = false },
+                    // A little space between the picture and the menu.
+                    offset = DpOffset(x = 0.dp, y = 8.dp),
+                ) {
+                    ProfileMenuItems(onSignOut = onSignOut, onClose = { menuOpen = false })
+                }
             }
         }
-        val text = title ?: if (onBack == null) stringResource(R.string.app_name) else null
-        if (text != null) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleLarge,
-                // A long title is cut off with "…", so the bar keeps its height.
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-        } else {
-            Spacer(modifier = Modifier.weight(1f))
-        }
-
         if (offline) {
             Icon(
                 painter = painterResource(R.drawable.ic_cloud_off),
                 contentDescription = stringResource(R.string.offline),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 12.dp),
+                modifier = Modifier.align(Alignment.Center),
             )
-        }
-        // Only the UI needs to know whether the menu is open, so it is kept here and not in a ViewModel.
-        var menuOpen by remember { mutableStateOf(false) }
-        Box {
-            ProfileImage(
-                userName = userName,
-                imageUrl = profileImageUrl,
-                // indication = null: no ripple animation on tap.
-                modifier = Modifier.clickable(interactionSource = null, indication = null) { menuOpen = true },
-            )
-            DropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { menuOpen = false },
-                // A little space between the picture and the menu.
-                offset = DpOffset(x = 0.dp, y = 8.dp),
-            ) {
-                ProfileMenuItems(onSignOut = onSignOut, onClose = { menuOpen = false })
-            }
         }
     }
 }

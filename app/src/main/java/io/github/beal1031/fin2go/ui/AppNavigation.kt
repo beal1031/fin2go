@@ -203,7 +203,8 @@ fun AppNavigation(
                 title = title,
                 onBack = if (!onHome && entry != null) ({ back(entry) }) else null,
                 onPicture = onDetailPage,
-                offline = offline,
+                // The cloud only on home and in the lists, not over the picture of a detail page.
+                offline = offline && !onDetailPage,
                 modifier = Modifier.padding(top = statusBarHeight),
             )
         }

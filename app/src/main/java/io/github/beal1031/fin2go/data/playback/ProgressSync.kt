@@ -49,6 +49,8 @@ data class PendingProgress(
     /** The playback on the server that was never ended, because the end could not be reported. */
     val mediaSourceId: String? = null,
     val playSessionId: String? = null,
+    /** Set when the item was marked by hand: true as watched, false as not watched. Then [positionMs] is 0. */
+    val watched: Boolean? = null,
 )
 
 /**
@@ -83,6 +85,23 @@ class ProgressSync(context: Context) {
             )
             prefs[pendingKey] = Json.encodeToString(pending + (itemId to new))
         }
+        schedule()
+    }
+
+    /**
+     * Keeps that [itemId] was marked as [watched] (or not watched) by hand, e.g. without internet,
+     * and sends it when there is internet. A position watched later replaces it.
+     */
+    suspend fun rememberWatched(itemId: String, watched: Boolean) {
+        dataStore.edit { prefs ->
+            val pending = PendingProgress(itemId, positionMs = 0L, savedAtMs = System.currentTimeMillis(), watched = watched)
+            prefs[pendingKey] = Json.encodeToString(read(prefs) + (itemId to pending))
+        }
+        schedule()
+    }
+
+    /** Sends the kept changes as soon as the phone has internet. */
+    private fun schedule() {
         WorkManager.getInstance(context).enqueueUniqueWork(
             WORK_NAME,
             ExistingWorkPolicy.REPLACE,
@@ -122,7 +141,16 @@ class ProgressSync(context: Context) {
             val serverHasOnlyOurOldPosition = pending.serverPositionMs != null &&
                 server.playbackPositionTicks / 10_000L == pending.serverPositionMs
             val serverIsNewer = server.lastPlayedDate?.isAfter(savedAt) == true
-            if (!serverIsNewer || serverHasOnlyOurOldPosition) {
+            val watchedByHand = pending.watched
+            if (watchedByHand != null) {
+                if (!serverIsNewer) {
+                    if (watchedByHand) {
+                        api.userDataApi.markPlayedItem(itemId = itemId, datePlayed = savedAt)
+                    } else {
+                        api.userDataApi.markUnplayedItem(itemId = itemId)
+                    }
+                }
+            } else if (!serverIsNewer || serverHasOnlyOurOldPosition) {
                 val positionTicks = pending.positionMs * 10_000L
                 // Ends the playback on the server, so it does not end it later by itself with the old position.
                 runCatching {

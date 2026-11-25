@@ -101,11 +101,15 @@ internal class OfflineLibrary(context: Context) {
 
     /**
      * Puts the position kept on the phone into the item, as the server would after the report:
-     * from 90 % on watched, below 5 % not started.
+     * from 90 % on watched, below 5 % not started. A watched mark set by hand is taken as it is.
      */
     private fun BaseItemDto.withLocalProgress(pending: PendingProgress?): BaseItemDto {
         val data = userData ?: return this
         if (pending == null) return this
+        pending.watched?.let { watched ->
+            // Marked by hand: as the server does it, without a position.
+            return copy(userData = data.copy(played = watched, playbackPositionTicks = 0L, playedPercentage = null))
+        }
         val positionTicks = pending.positionMs * 10_000L
         val share = runTimeTicks?.takeIf { it > 0 }?.let { positionTicks.toDouble() / it }
         val watched = share != null && share >= 0.9

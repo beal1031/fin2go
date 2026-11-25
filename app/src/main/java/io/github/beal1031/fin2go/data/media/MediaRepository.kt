@@ -3,6 +3,7 @@ package io.github.beal1031.fin2go.data.media
 import android.content.Context
 import io.github.beal1031.fin2go.data.JellyfinClient
 import io.github.beal1031.fin2go.data.ServerStatus
+import io.github.beal1031.fin2go.data.playback.ProgressSync
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -32,6 +33,7 @@ class MediaRepository(context: Context) {
     private val context = context.applicationContext
     private val api = JellyfinClient.api(context)
     private val offline = OfflineLibrary(context)
+    private val progressSync = ProgressSync(context)
 
     /** Where the pictures come from: the server, or the files saved with the downloads. */
     private fun interface Images {
@@ -375,11 +377,27 @@ class MediaRepository(context: Context) {
         return if (last.watched) episodes.getOrNull(lastIndex + 1)?.details ?: last else last
     }
 
-    /** Marks a movie or episode as fully watched, or as not watched. */
+    /**
+     * Marks a movie or episode as fully watched, or as not watched. Without the server, a downloaded item
+     * is marked on the phone, and the mark is sent as soon as the server is reachable again.
+     */
     suspend fun setWatched(id: String, watched: Boolean) {
         withContext(Dispatchers.IO) {
             val itemId = UUID.fromString(id)
-            if (watched) api.userDataApi.markPlayedItem(itemId = itemId) else api.userDataApi.markUnplayedItem(itemId = itemId)
+            val failure = if (ServerStatus.reachable(context).value) {
+                runCatching {
+                    if (watched) api.userDataApi.markPlayedItem(itemId = itemId) else api.userDataApi.markUnplayedItem(itemId = itemId)
+                }.exceptionOrNull()
+            } else {
+                IllegalStateException("Server not reachable")
+            }
+            when {
+                // The server has the newest state now; a mark kept from before is outdated.
+                failure == null -> progressSync.forget(id)
+                failure is CancellationException -> throw failure
+                offline.item(id) != null -> progressSync.rememberWatched(id, watched)
+                else -> throw failure
+            }
         }
     }
 

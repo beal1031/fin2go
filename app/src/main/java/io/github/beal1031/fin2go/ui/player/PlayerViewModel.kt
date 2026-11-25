@@ -239,7 +239,7 @@ class PlayerViewModel(
         viewModelScope.launch {
             try {
                 if (old != null) playback.reportStopped(old, position)
-                // Without the server this fails; the episode change must still work.
+                // A failure here must not stop the change of episode.
                 runCatching { media.setWatched(oldId, forward) }
                 runCatching { media.setWatched(target, false) }
                 start(before)
